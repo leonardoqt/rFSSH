@@ -23,6 +23,7 @@ int main()
 	//
 	double ek0 = 1e-3, ek1 = 1e-1;
 	// TODO: for now impose start from no population on impurities. need to decide which state to start if having initila population
+	// TODO: to avoid recurrence of the bath, need ek > 1e-1, need to think about how to avoid this
 	int nek = 60, state = 0;
 	int sample = 10000;
 	//
