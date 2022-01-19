@@ -38,63 +38,76 @@ void ionic::move(potential& HH)
 	double dtl = -1,dtr = -1, deltal,deltar,t1,t2;
 	double tmp;
 	//
-	v_pre = v_new;
-	ind_pre = ind_new;
-	//
-	deltal = v_pre*v_pre-2*aa*HH.dx;
-	deltar = v_pre*v_pre+2*aa*HH.dx;
-	// allow right
-	if (ek + HH.H_fock(istate,ind_pre) >= HH.H_fock(istate,ind_pre+1) && deltar > 0)
+	if ( abs(aa) < 1e-15)
 	{
-		deltar = sqrt(deltar);
-		t1 = (-v_pre + deltar) / aa;
-		t2 = (-v_pre - deltar) / aa;
-		if (t1 * t2 > 0)
-			dtr = fmin(t1,t2);
+		v_pre = v_new;
+		ind_pre = ind_new;
+		dt = HH.dx / abs(v_pre);
+		if ( v_pre < 0 )
+			ind_new--;
 		else
-			dtr = fmax(t1,t2);
-	}
-	// allow left
-	if (ek + HH.H_fock(istate,ind_pre) >= HH.H_fock(istate,ind_pre-1) && deltal > 0)
-	{
-		deltal = sqrt(deltal);
-		t1 = (-v_pre + deltal) / aa;
-		t2 = (-v_pre - deltal) / aa;
-		if (t1 * t2 > 0)
-			dtl = fmin(t1,t2);
-		else
-			dtl = fmax(t1,t2);
-	}
-	// choose dt
-	if (dtl<0 && dtr<0)
-		// have to stay middle
-		dt = -2*v_pre/aa;
-	else if (dtl*dtr > 0)
-		dt = fmin(dtl,dtr);
-	else
-		dt = fmax(dtl,dtr);
-	//
-	// set new status
-	tmp = 0.5*aa*dt*dt + v_pre*dt;
-	if (tmp > 0.5*HH.dx)
-	{
-		// move right
-		ind_new = ind_pre+1;
-		ek = HH.H_fock(istate,ind_pre) + ek - HH.H_fock(istate,ind_new);
-		v_new = sqrt(2*ek / mass);
-	}
-	else if (tmp < -0.5*HH.dx)
-	{
-		// move left
-		ind_new = ind_pre-1;
-		ek = HH.H_fock(istate,ind_pre) + ek - HH.H_fock(istate,ind_new);
-		v_new =-sqrt(2*ek / mass);
+			ind_new++;
 	}
 	else
 	{
-		// stay middle
-		ind_new = ind_pre;
-		v_new = - v_pre;
+		v_pre = v_new;
+		ind_pre = ind_new;
+		//
+		deltal = v_pre*v_pre-2*aa*HH.dx;
+		deltar = v_pre*v_pre+2*aa*HH.dx;
+		// allow right
+		if (ek + HH.H_fock(istate,ind_pre) >= HH.H_fock(istate,ind_pre+1) && deltar > 0)
+		{
+			deltar = sqrt(deltar);
+			t1 = (-v_pre + deltar) / aa;
+			t2 = (-v_pre - deltar) / aa;
+			if (t1 * t2 > 0)
+				dtr = fmin(t1,t2);
+			else
+				dtr = fmax(t1,t2);
+		}
+		// allow left
+		if (ek + HH.H_fock(istate,ind_pre) >= HH.H_fock(istate,ind_pre-1) && deltal > 0)
+		{
+			deltal = sqrt(deltal);
+			t1 = (-v_pre + deltal) / aa;
+			t2 = (-v_pre - deltal) / aa;
+			if (t1 * t2 > 0)
+				dtl = fmin(t1,t2);
+			else
+				dtl = fmax(t1,t2);
+		}
+		// choose dt
+		if (dtl<0 && dtr<0)
+			// have to stay middle
+			dt = -2*v_pre/aa;
+		else if (dtl*dtr > 0)
+			dt = fmin(dtl,dtr);
+		else
+			dt = fmax(dtl,dtr);
+		//
+		// set new status
+		tmp = 0.5*aa*dt*dt + v_pre*dt;
+		if (tmp > 0.5*HH.dx)
+		{
+			// move right
+			ind_new = ind_pre+1;
+			ek = HH.H_fock(istate,ind_pre) + ek - HH.H_fock(istate,ind_new);
+			v_new = sqrt(2*ek / mass);
+		}
+		else if (tmp < -0.5*HH.dx)
+		{
+			// move left
+			ind_new = ind_pre-1;
+			ek = HH.H_fock(istate,ind_pre) + ek - HH.H_fock(istate,ind_new);
+			v_new =-sqrt(2*ek / mass);
+		}
+		else
+		{
+			// stay middle
+			ind_new = ind_pre;
+			v_new = - v_pre;
+		}
 	}
 }
 
@@ -143,10 +156,9 @@ void ionic::try_hop(potential& HH, cx_mat& rho, mat& hop_bath)
 		if (ek + HH.H_fock(istate,ind_pre) < HH.H_fock(t1,ind_pre))
 			rate_s(t1) = 0;
 	}
-	//std::cout<<ind_new<<'\t'<<v_new;
-	//for( int t1=0; t1<HH.dim; t1++)
-	//	std::cout<<'\t'<<rate(t1);
-	//std::cout<<std::endl;
+	//rate_s.t().print();
+	//rate_b.t().print();
+	//cout<<endl;
 	//
 	vec rate = join_vert(rate_s,rate_b);
 	for (int t1=1; t1<HH.sz_fock*2; t1++)

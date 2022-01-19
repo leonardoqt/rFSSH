@@ -82,7 +82,7 @@ int main()
 			{
 				AA.move(HH);
 				EE.evolve(HH,AA);
-				EE.fit_drho_v1(HH,AA);
+				EE.fit_drho_v2(HH,AA);
 				//EE.try_decoherence(AA);
 				AA.try_hop(HH,EE.rho_fock_old,EE.hop_bath);
 				if (abs(AA.check_stop()))
@@ -115,6 +115,7 @@ int main()
 				cout<<'\t'<<counter_t(t1)/sample_myself/size;
 			for (int t1=0; t1<HH.sz_fock; t1++)
 				cout<<'\t'<<counter_r(t1)/sample_myself/size;
+			cout<<endl;
 			//cout<<'\t'<<ave_hops/sample_myself/size<<endl;
 		}
 	}

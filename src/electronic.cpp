@@ -3,6 +3,7 @@
 
 using namespace arma;
 
+// TODO: may change from init rho0_s to rho0_fock
 void electronic::init_rho(mat rho0_s, potential& HH, double Beta)
 {
 	beta = Beta;
@@ -25,23 +26,35 @@ void electronic::init_rho(mat rho0_s, potential& HH, double Beta)
 	rho_fock_old = rho_fock;
 	//
 	hop_bath = zeros<mat>(HH.sz_fock,HH.sz_fock);
+	//real(N_s).print("N_s");
+	//real(N_t).print("N_t");
+	//real(rho_fock).print("rho_fock");
 }
 
 void electronic::evolve(potential& HH, ionic& AA)
 {
 	cx_double ii = cx_double(0,1);
-	mat U_t = HH.eigvec_t.slice(AA.ind_new);
-	mat U_s = HH.eigvec_s.slice(AA.ind_new);
+	mat U_t = HH.eigvec_t.slice(AA.ind_pre);
+	mat U_s = HH.eigvec_s.slice(AA.ind_pre);
+	mat U_s2= HH.eigvec_s.slice(AA.ind_new);
 	cx_mat d0_da = U_t.t() * cx_mat(eye(HH.sz_t,HH.sz_s),zeros<mat>(HH.sz_t,HH.sz_s));
 	cx_mat N0_a = U_t.t() * N_t * U_t;
 	cx_mat dt_da = d0_da;
-	cx_mat phase = exp(cx_double(1,0)*HH.eigval_t.col(AA.ind_new)*AA.dt);
+	cx_vec phase = exp(ii*HH.eigval_t.col(AA.ind_pre)*AA.dt);
+	//cout<<AA.dt<<endl;
+	//d0_da.print("d0_da");
+	//N0_a.print("N0_a");
+	//phase.print("phase");
+	//exit(EXIT_FAILURE);
 	for (int t1=0; t1<HH.sz_t; t1++)
 		dt_da.row(t1) = phase(t1) * d0_da.row(t1);
-	cx_mat dt_aa = dt_da * U_s;
+	// TODO: make sure we want the new adiabats (after dt not before dt, which is U_s)
+	cx_mat dt_aa = dt_da * U_s2;
 	//
 	// N_s
 	N_s = dt_aa.t() * N0_a * dt_aa;
+	//N_s.print();
+	//exit(EXIT_FAILURE);
 	//
 	// N_t
 	cx_mat U_t_phase = zeros<cx_mat>(HH.sz_t,HH.sz_t);
@@ -59,12 +72,21 @@ void electronic::evolve(potential& HH, ionic& AA)
 	rho_fock(1,2) = N_s(0,1);
 	rho_fock(2,1) = N_s(1,0);
 	//
+	//rho_fock.print("rho_fock");
+	//rho_fock_old.print("rho_fock_old");
+	//exit(EXIT_FAILURE);
 	drho = ( rho_fock - rho_fock_old ) / AA.dt;
 	//
 	// drho_2fit, it equals drho/dt + i[H, rho] + [T, rho]
+	// the evolution use H old, but basis transform should be avarged
+	mat hh = diagmat(HH.H_fock.col(AA.ind_pre));
+	mat dd = (HH.dd.slice(AA.ind_pre) + HH.dd.slice(AA.ind_new))/2;
 	drho_2fit  = drho;
-	drho_2fit += ii * ( diagmat(HH.H_fock.col(AA.ind_pre))*rho_fock_old - rho_fock_old*diagmat(HH.H_fock.col(AA.ind_pre)) );
-	drho_2fit += AA.v_pre * ( HH.dd.slice(AA.ind_pre)*rho_fock_old - rho_fock_old*HH.dd.slice(AA.ind_pre) );
+	drho_2fit +=       ii * ( hh*rho_fock_old - rho_fock_old*hh );
+	drho_2fit += AA.v_pre * ( dd*rho_fock_old - rho_fock_old*dd );
+	//drho.print("drho");
+	//drho_2fit.print("drho2fit");
+	//exit(EXIT_FAILURE);
 }
 
 void electronic::fit_drho_v1(potential& HH, ionic& AA)
@@ -106,6 +128,9 @@ void electronic::fit_drho_v1(potential& HH, ionic& AA)
 	mat MM = real(M.t()*M);
 	vec MV = real(M.t()*V);
 	vec Lambda = MM.i()*MV;
+	//reshape(V,4,4).print("target");
+	//reshape(M*Lambda-V,4,4).print("res");
+	//exit(EXIT_FAILURE);
 	//
 	// put results into hop_bath, where hop_bath(i,j) is from i to j, i.e., |j><i|
 	hop_bath = zeros<mat>(4,4);
@@ -114,6 +139,61 @@ void electronic::fit_drho_v1(potential& HH, ionic& AA)
 	hop_bath(0,2) = Lambda(1)*exp(-beta*HH.eigval_s(1,AA.ind_pre)); hop_bath(2,0) = Lambda(1);
 	hop_bath(1,3) = Lambda(1)*exp(-beta*HH.eigval_s(1,AA.ind_pre)); hop_bath(3,1) = Lambda(1);
 }
+
+void electronic::fit_drho_v2(potential& HH, ionic& AA)
+{
+	//
+	//   0,  1,  2,  3,  4,  5,  6,  7
+	// L01,L10,L23,L32,L02,L20,L13,L31;
+	// L01 -> |0><1|, which hops from 1 to 0
+	cube LL(4,4,8,fill::zeros);
+	mat L;
+	LL(0,1,0) = LL(1,0,1) = LL(2,3,2) = LL(3,2,3) = 1;
+	LL(0,2,4) = LL(2,0,5) = LL(1,3,6) = LL(3,1,7) = 1;
+	//
+	cx_mat rho_dot0(4,4,fill::zeros);
+	cx_mat rho_dot1(4,4,fill::zeros);
+	cx_mat rho_dot2(4,4,fill::zeros);
+	cx_mat rho_dot3(4,4,fill::zeros);
+	// lambda_01/lambda_10 = exp(beta*E), i.e.,
+	// lambda_10 = lambda_01 * exp(-beta*E)
+	L = LL.slice(0);
+	rho_dot0 += L*rho_fock_old*L.t() - (L.t()*L*rho_fock_old + rho_fock_old*L.t()*L)/2;
+	L = LL.slice(1);
+	rho_dot0 += exp(-beta*HH.eigval_s(0,AA.ind_pre)) * ( L*rho_fock_old*L.t() - (L.t()*L*rho_fock_old + rho_fock_old*L.t()*L)/2 );
+	L = LL.slice(2);
+	rho_dot1 += L*rho_fock_old*L.t() - (L.t()*L*rho_fock_old + rho_fock_old*L.t()*L)/2;
+	L = LL.slice(3);
+	rho_dot1 += exp(-beta*HH.eigval_s(0,AA.ind_pre)) * ( L*rho_fock_old*L.t() - (L.t()*L*rho_fock_old + rho_fock_old*L.t()*L)/2 );
+	//
+	L = LL.slice(4);
+	rho_dot2 += L*rho_fock_old*L.t() - (L.t()*L*rho_fock_old + rho_fock_old*L.t()*L)/2;
+	L = LL.slice(5);
+	rho_dot2 += exp(-beta*HH.eigval_s(1,AA.ind_pre)) * ( L*rho_fock_old*L.t() - (L.t()*L*rho_fock_old + rho_fock_old*L.t()*L)/2 );
+	L = LL.slice(6);
+	rho_dot3 += L*rho_fock_old*L.t() - (L.t()*L*rho_fock_old + rho_fock_old*L.t()*L)/2;
+	L = LL.slice(7);
+	rho_dot3 += exp(-beta*HH.eigval_s(1,AA.ind_pre)) * ( L*rho_fock_old*L.t() - (L.t()*L*rho_fock_old + rho_fock_old*L.t()*L)/2 );
+	//
+	// fitting: write rho as a column vector, V = drho_2fit, M = [rho_dot1, rho_dot2]
+	// then Lambda = (M\dagger M)^(-1)*Re(M\dagger V), where Lambda = [l1; l2]
+	cx_vec V = drho_2fit.as_col();
+	cx_mat M = join_horiz(rho_dot0.as_col(),rho_dot1.as_col(),rho_dot2.as_col(),rho_dot3.as_col());
+	mat MM = real(M.t()*M);
+	vec MV = real(M.t()*V);
+	vec Lambda = pinv(MM)*MV;
+	//reshape(V,4,4).print("target");
+	//reshape(M*Lambda-V,4,4).print("res");
+	//exit(EXIT_FAILURE);
+	//
+	// put results into hop_bath, where hop_bath(i,j) is from i to j, i.e., |j><i|
+	hop_bath = zeros<mat>(4,4);
+	hop_bath(0,1) = Lambda(0)*exp(-beta*HH.eigval_s(0,AA.ind_pre)); hop_bath(1,0) = Lambda(0);
+	hop_bath(2,3) = Lambda(1)*exp(-beta*HH.eigval_s(0,AA.ind_pre)); hop_bath(3,2) = Lambda(1);
+	hop_bath(0,2) = Lambda(2)*exp(-beta*HH.eigval_s(1,AA.ind_pre)); hop_bath(2,0) = Lambda(2);
+	hop_bath(1,3) = Lambda(3)*exp(-beta*HH.eigval_s(1,AA.ind_pre)); hop_bath(3,1) = Lambda(3);
+}
+
 
 //void electronic::try_decoherence(ionic& AA)
 //{

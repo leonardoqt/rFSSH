@@ -32,6 +32,8 @@ void potential::generate_H(vec X, double E1, double E2, double vdd, double gamma
 			Ht(t2+sz_s,1,t1) = vsb2;
 		}
 	}
+	//Hs.slice(nx-1).print("Hs");
+	//Ht.slice(nx-1).print("Ht");
 }
 
 void potential::diag_H()
@@ -52,7 +54,7 @@ void potential::diag_H()
 		eig_sym(tmp,eigvec_s.slice(t1),Hs.slice(t1));
 		eigval_s.col(t1) = tmp;
 	}
-	// sign correction for eigvec
+	// sign correction for eigvec_s
 	for(int t1=0; t1<sz_s; t1++)
 	{
 		for(int t2=1; t2<nx; t2++)
