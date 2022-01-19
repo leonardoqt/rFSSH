@@ -20,7 +20,7 @@ public:
 	//
 	void init(potential& pp, double Mass, double vv, double xx, int state, double xl, double xr);
 	void move(potential& pp);
-	void try_hop(potential& pp, arma::cx_mat& rho);
+	void try_hop(potential& pp, arma::cx_mat& rho, arma::mat& hop_bath);
 	void print_rate(arma::vec& xx, potential& pp, arma::cx_mat& rho);
 	int check_stop();
 };

@@ -4,7 +4,7 @@
 
 using namespace arma;
 
-void potential::generate_H(vec X, double E1, double E2, double vdd, double vsb1, double vsb2)
+void potential::generate_H(vec X, double E1, double E2, double vdd, double gamma1, double gamma2)
 {
 	sz_t = sz_s + nbath;
 	x = X;
@@ -13,6 +13,8 @@ void potential::generate_H(vec X, double E1, double E2, double vdd, double vsb1,
 	Hs = cube(sz_s,sz_s,nx,fill::zeros);
 	Ht = cube(sz_t,sz_t,nx,fill::zeros);
 	Eb = linspace(-dep_bath,dep_bath,nbath);
+	double vsb1 = sqrt( gamma1/(datum::pi*nbath/dep_bath) );
+	double vsb2 = sqrt( gamma2/(datum::pi*nbath/dep_bath) );
 	//
 	//=========================================
 	for (int t1=0; t1<nx; t1++)

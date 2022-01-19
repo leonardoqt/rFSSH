@@ -107,147 +107,66 @@ int ionic::check_stop()
 	return 0;
 }
 
-void ionic::try_hop(potential& HH, cx_mat& rho)
+void ionic::try_hop(potential& HH, cx_mat& rho, mat& hop_bath)
 {
 	// Gij should be 2Re( dt * (dd*v)_ij * rho_ji ) / rho_ii
-	cx_mat T = HH.dd.slice(ind_new) * dt * cx_double(v_new,0.0);
-	vec rate(HH.dim);
+	cx_mat T = HH.dd.slice(ind_pre) * dt * cx_double(v_pre,0.0);
+	vec rate_s(HH.sz_fock);
+	vec rate_b(HH.sz_fock);
 	//
-	for (int t1=0; t1<HH.dim; t1++)
+	// TODO: rethink about this part
+	//*************
+	/*
+	// rho_ii_dot can be splitted into two terms, the ration decides whether it undergoes the derivative coupling procedue or relaxation procedure
+	cx_mat rho_dot1 = (T*rho - rho*T)/dt;
+	double rho_ii_dot1 = real(rho_dot1(istate,istate));
+	double rho_ii_dot2 = sum(hop_bath.row(istate))*real(rho(istate,istate));
+	*/
+	//*************
+	//
+	for (int t1=0; t1<HH.sz_fock; t1++)
 	{
 		if (t1==istate)
-			rate(t1) = 0;
+		{
+			rate_s(t1) = 0;
+			rate_b(t1) = 0;
+		}
 		else
-			rate(t1) = real( T(istate,t1)*rho(t1,istate) ) * 2 / real(rho(istate,istate));
-		if (rate(t1) < 0)
-			rate(t1) = 0;
-		if (ek + HH.H_fock(istate,ind_new) < HH.H_fock(t1,ind_new))
-			rate(t1) = 0;
+		{
+			rate_s(t1) = real( T(istate,t1)*rho(t1,istate) ) * 2 / real(rho(istate,istate));
+			rate_b(t1) = hop_bath(istate,t1) * dt;
+		}
+		if (rate_s(t1) < 0)
+			rate_s(t1) = 0;
+		if (rate_b(t1) < 0)
+			rate_b(t1) = 0;
+		if (ek + HH.H_fock(istate,ind_pre) < HH.H_fock(t1,ind_pre))
+			rate_s(t1) = 0;
 	}
 	//std::cout<<ind_new<<'\t'<<v_new;
 	//for( int t1=0; t1<HH.dim; t1++)
 	//	std::cout<<'\t'<<rate(t1);
 	//std::cout<<std::endl;
 	//
-	for (int t1=1; t1<HH.dim; t1++)
+	vec rate = join_vert(rate_s,rate_b);
+	for (int t1=1; t1<HH.sz_fock*2; t1++)
 		rate(t1) += rate(t1-1);
 	//
 	vec tmp(1,fill::randu);
 	int new_state = istate;
-	for (int t1=0; t1<HH.dim; t1++)
+	int from_bath = 0;
+	for (int t1=0; t1<HH.sz_fock*2; t1++)
 		if( tmp(0) < rate(t1) )
 		{
-			new_state = t1;
+			new_state = t1 % HH.sz_fock;
+			from_bath = t1 / HH.sz_fock;
 			break;
 		}
 	//
-	double ek_new = ek + HH.H_fock(istate,ind_new) - HH.H_fock(new_state,ind_new);
-	v_new = v_new * sqrt(ek_new / ek);
-	ek = ek_new;
-	if (istate != new_state) nhops++;
-	istate = new_state;
-}
-
-void ionic::try_hop_with_bath_state2(potential& HH, cx_mat& rho)
-{
-	// look at diagonal of d\rho/dt
-	//
-	// the system part is [ 2Im( H_ij * rho_ji ) + 2Re( (dd*v)_ij * rho_ji ) ] * dt / rho_ii
-	//
-	// the bath part together is B_bath * rho, since B_bath is in diabatic basis,
-	// need to change basis first:
-	//     U\dagger [ B * (U \rho U\dagger) ] U
-	//
-	// for dim > 2, need to directly change basis for B, wich in tensor form is B_ij^kl, i.e.
-	// B(new basis)_ij^kl = U\dagger_ia U\dagger_jb U_kc U_ld B_ab^cd
-	// then the term with rho_ij should mean rate from i to j.
-	// Q(1): how to deal with rho_ii term
-	// Q(2): could there be rho_ab term where neither a nor b is i?
-	// 
-	if( HH.dim != 2)
+	// adjust velocity
+	if (from_bath == 0)
 	{
-		cout<<"The dimension of H must be 2"<<endl;
-		exit(EXIT_FAILURE);
-	}
-	cx_mat T = HH.dd_with_bath.slice(ind_new) * v_new;
-	vec rate_s(HH.dim), rate_b(HH.dim), rate(HH.dim*2);
-	//
-	// system part
-	for (int t1=0; t1<HH.dim; t1++)
-	{
-		if (t1==istate)
-			rate_s(t1) = 0;
-		else
-		{
-			rate_s(t1) = real( T(istate,t1)*rho(t1,istate) ) + imag( HH.H_with_bath(istate,t1,ind_new)*rho(t1,istate) );
-			rate_s(t1) *= (2*dt)/real(rho(istate,istate));
-		}
-	}
-	//
-	// bath part
-	cx_mat U = HH.eigvec_with_bath.slice(ind_new);
-	cx_mat tmp_rate = U.t()*reshape(HH.B_bath.slice(ind_new)*reshape(U*rho*U.t(),4,1),2,2)*U;
-	rate_b(istate) = 0;
-	rate_b(1-istate) = -real(tmp_rate(istate,istate))*dt/real(rho(istate,istate));
-	//
-	// adjust rate, < 0 and energy forbidden
-	for(int t1=0; t1<HH.dim; t1++)
-	{
-		if(ek + HH.eigval_with_bath(istate,ind_new) < HH.eigval_with_bath(t1,ind_new))
-		{
-			rate(t1) = 0;
-			if(rate_s(t1)+rate_b(t1)<0)
-				rate(t1+HH.dim) = 0;
-			else if(rate_s(t1)<0)
-				rate(t1+HH.dim) = rate_s(t1)+rate_b(t1);
-			else if(rate_b(t1)<0)
-				rate(t1+HH.dim) = 0;
-			else
-				rate(t1+HH.dim) = rate_b(t1);
-		}
-		else
-		{
-			if(rate_s(t1)+rate_b(t1)<0)
-				rate(t1) = rate(t1+HH.dim) = 0;
-			else if(rate_s(t1)<0)
-			{
-				rate(t1) = 0;
-				rate(t1+HH.dim) = rate_s(t1)+rate_b(t1);
-			}
-			else if(rate_b(t1)<0)
-			{
-				rate(t1) = rate_s(t1)+rate_b(t1);
-				rate(t1+HH.dim) = 0;
-			}
-			else
-			{
-				rate(t1) = rate_s(t1);
-				rate(t1+HH.dim) = rate_b(t1);
-			}
-		}
-	}
-	for (int t1=1; t1<HH.dim*2; t1++)
-		rate(t1) += rate(t1-1);
-	// TODO: this should never happen, it means dt is too big, should through out an warning
-	if(rate(HH.dim*2-1) > 1)
-		rate = rate / rate(HH.dim*2-1);
-	//
-	vec tmp(1,fill::randu);
-	int new_state = istate;
-	int rescale_energy=0;
-	for (int t1=0; t1<HH.dim*2; t1++)
-		if( tmp(0) < rate(t1) )
-		{
-			new_state = t1%HH.dim;
-			if( t1 < HH.dim)
-				rescale_energy = 1;
-			break;
-		}
-	//
-	double ek_new = ek;
-	if (rescale_energy)
-	{
-		ek_new = ek_new + HH.eigval_with_bath(istate,ind_new) - HH.eigval_with_bath(new_state,ind_new);
+		double ek_new = ek + HH.H_fock(istate,ind_new) - HH.H_fock(new_state,ind_new);
 		v_new = v_new * sqrt(ek_new / ek);
 		ek = ek_new;
 	}
@@ -255,13 +174,120 @@ void ionic::try_hop_with_bath_state2(potential& HH, cx_mat& rho)
 	istate = new_state;
 }
 
-void ionic::print_rate(arma::vec& xx, potential& HH, arma::cx_mat& rho)
-{
-	int sz=HH.dim;
-	cx_mat T = HH.dd.slice(ind_new) * dt * cx_double(v_new,0.0);
-	cout<<xx(ind_new);
-	for (int t1=0; t1<sz-1; t1++)
-		for (int t2=t1+1;t2<sz; t2++)
-			cout<<'\t'<<2*real(T(t1,t2)*rho(t2,t1));
-	cout<<endl;
-}
+//void ionic::try_hop_with_bath_state2(potential& HH, cx_mat& rho)
+//{
+//	// look at diagonal of d\rho/dt
+//	//
+//	// the system part is [ 2Im( H_ij * rho_ji ) + 2Re( (dd*v)_ij * rho_ji ) ] * dt / rho_ii
+//	//
+//	// the bath part together is B_bath * rho, since B_bath is in diabatic basis,
+//	// need to change basis first:
+//	//     U\dagger [ B * (U \rho U\dagger) ] U
+//	//
+//	// for dim > 2, need to directly change basis for B, wich in tensor form is B_ij^kl, i.e.
+//	// B(new basis)_ij^kl = U\dagger_ia U\dagger_jb U_kc U_ld B_ab^cd
+//	// then the term with rho_ij should mean rate from i to j.
+//	// Q(1): how to deal with rho_ii term
+//	// Q(2): could there be rho_ab term where neither a nor b is i?
+//	// 
+//	if( HH.dim != 2)
+//	{
+//		cout<<"The dimension of H must be 2"<<endl;
+//		exit(EXIT_FAILURE);
+//	}
+//	cx_mat T = HH.dd_with_bath.slice(ind_new) * v_new;
+//	vec rate_s(HH.dim), rate_b(HH.dim), rate(HH.dim*2);
+//	//
+//	// system part
+//	for (int t1=0; t1<HH.dim; t1++)
+//	{
+//		if (t1==istate)
+//			rate_s(t1) = 0;
+//		else
+//		{
+//			rate_s(t1) = real( T(istate,t1)*rho(t1,istate) ) + imag( HH.H_with_bath(istate,t1,ind_new)*rho(t1,istate) );
+//			rate_s(t1) *= (2*dt)/real(rho(istate,istate));
+//		}
+//	}
+//	//
+//	// bath part
+//	cx_mat U = HH.eigvec_with_bath.slice(ind_new);
+//	cx_mat tmp_rate = U.t()*reshape(HH.B_bath.slice(ind_new)*reshape(U*rho*U.t(),4,1),2,2)*U;
+//	rate_b(istate) = 0;
+//	rate_b(1-istate) = -real(tmp_rate(istate,istate))*dt/real(rho(istate,istate));
+//	//
+//	// adjust rate, < 0 and energy forbidden
+//	for(int t1=0; t1<HH.dim; t1++)
+//	{
+//		if(ek + HH.eigval_with_bath(istate,ind_new) < HH.eigval_with_bath(t1,ind_new))
+//		{
+//			rate(t1) = 0;
+//			if(rate_s(t1)+rate_b(t1)<0)
+//				rate(t1+HH.dim) = 0;
+//			else if(rate_s(t1)<0)
+//				rate(t1+HH.dim) = rate_s(t1)+rate_b(t1);
+//			else if(rate_b(t1)<0)
+//				rate(t1+HH.dim) = 0;
+//			else
+//				rate(t1+HH.dim) = rate_b(t1);
+//		}
+//		else
+//		{
+//			if(rate_s(t1)+rate_b(t1)<0)
+//				rate(t1) = rate(t1+HH.dim) = 0;
+//			else if(rate_s(t1)<0)
+//			{
+//				rate(t1) = 0;
+//				rate(t1+HH.dim) = rate_s(t1)+rate_b(t1);
+//			}
+//			else if(rate_b(t1)<0)
+//			{
+//				rate(t1) = rate_s(t1)+rate_b(t1);
+//				rate(t1+HH.dim) = 0;
+//			}
+//			else
+//			{
+//				rate(t1) = rate_s(t1);
+//				rate(t1+HH.dim) = rate_b(t1);
+//			}
+//		}
+//	}
+//	for (int t1=1; t1<HH.dim*2; t1++)
+//		rate(t1) += rate(t1-1);
+//	// TODO: this should never happen, it means dt is too big, should through out an warning
+//	if(rate(HH.dim*2-1) > 1)
+//		rate = rate / rate(HH.dim*2-1);
+//	//
+//	vec tmp(1,fill::randu);
+//	int new_state = istate;
+//	int rescale_energy=0;
+//	for (int t1=0; t1<HH.dim*2; t1++)
+//		if( tmp(0) < rate(t1) )
+//		{
+//			new_state = t1%HH.dim;
+//			if( t1 < HH.dim)
+//				rescale_energy = 1;
+//			break;
+//		}
+//	//
+//	double ek_new = ek;
+//	if (rescale_energy)
+//	{
+//		ek_new = ek_new + HH.eigval_with_bath(istate,ind_new) - HH.eigval_with_bath(new_state,ind_new);
+//		v_new = v_new * sqrt(ek_new / ek);
+//		ek = ek_new;
+//	}
+//	if (istate != new_state) nhops++;
+//	istate = new_state;
+//}
+
+//void ionic::print_rate(arma::vec& xx, potential& HH, arma::cx_mat& rho)
+//{
+//	int sz=HH.dim;
+//	cx_mat T = HH.dd.slice(ind_new) * dt * cx_double(v_new,0.0);
+//	cout<<xx(ind_new);
+//	for (int t1=0; t1<sz-1; t1++)
+//		for (int t2=t1+1;t2<sz; t2++)
+//			cout<<'\t'<<2*real(T(t1,t2)*rho(t2,t1));
+//	cout<<endl;
+//}

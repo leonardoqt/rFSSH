@@ -22,7 +22,7 @@ public:
 	arma::cube eigvec_t, eigvec_s;
 	arma::mat eigval_t, eigval_s, F, H_fock;
 	arma::cube dd;
-	void generate_H(arma::vec X, double E1, double E2, double vdd, double vsb1, double vsb2);
+	void generate_H(arma::vec X, double E1, double E2, double vdd, double gamma1, double gamma2);
 	//
 	void diag_H();
 };

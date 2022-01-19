@@ -15,27 +15,35 @@ int main()
 	MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 	MPI_Comm_size(MPI_COMM_WORLD,&size);
 	arma_rng::set_seed(time(0)+rank*10);
-	//double dE, v0, v1, v2, bb, ek0, ek1;
-	//int opt_option=0;
-	double B0=3e-3,beta=1e2;
-	double ek0, ek1;
+	//
+	double E1 = -0.1, E2 = -0.11, vdd = 0.04;
+	double gamma1 = 0.02, gamma2 = 0.0;
+	double temperature = 0.1;
+	double beta = 1/temperature;
+	//
+	double ek0 = 1e-3, ek1 = 1e-1;
+	// TODO: for now impose start from no population on impurities. need to decide which state to start if having initila population
 	int nek = 60, state = 0;
 	int sample = 10000;
+	//
 	if ( rank == 0 )
-		cin>>B0>>beta>>ek0>>ek1>>nek>>sample>>state;
-	MPI_Bcast(&B0     ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
-	MPI_Bcast(&beta   ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+		cin>>E1>>E2>>vdd>>gamma1>>gamma2>>ek0>>ek1>>nek>>sample;
+	MPI_Bcast(&E1     ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+	MPI_Bcast(&E2     ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+	MPI_Bcast(&vdd    ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+	MPI_Bcast(&gamma1 ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+	MPI_Bcast(&gamma2 ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
 	MPI_Bcast(&ek0    ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
 	MPI_Bcast(&ek1    ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
 	MPI_Bcast(&nek    ,1,MPI_INT,0,MPI_COMM_WORLD);
 	MPI_Bcast(&sample ,1,MPI_INT,0,MPI_COMM_WORLD);
-	MPI_Bcast(&state  ,1,MPI_INT,0,MPI_COMM_WORLD);
+	//MPI_Bcast(&state  ,1,MPI_INT,0,MPI_COMM_WORLD);
 	//====================
 	potential HH;
 	ionic AA;
 	electronic EE;
-	vec x = linspace(-8,8,3200);
-	vec psi0(HH.dim,fill::zeros);
+	vec x = linspace(-8,8,1600);
+	mat rho0(HH.sz_s,HH.sz_s,fill::zeros);
 	//
 	double mass = 2000;
 	double xstart = -6;
@@ -48,13 +56,12 @@ int main()
 	double ave_hops=0.0;
 	//
 	vec vv = linspace(sqrt(2*ek0/mass),sqrt(2*ek1/mass),nek);
-	vec counter_t(HH.dim,fill::zeros), counter_r(HH.dim,fill::zeros);
+	vec counter_t(HH.sz_fock,fill::zeros), counter_r(HH.sz_fock,fill::zeros);
 	//
 	sample_myself = sample / size;
-	psi0(state) = 1;
 	//
-	HH.generate_H2_with_bath(x,beta,B0);
-	HH.diag_HB_with_bath();
+	HH.generate_H(x,E1,E2,vdd,gamma1,gamma2);
+	HH.diag_H();
 	////
 	//if (rank ==0)
 	//	for(uword t1=0; t1< x.n_elem; t1++)
@@ -69,21 +76,18 @@ int main()
 		for (int t0=0; t0<sample_myself;t0++)
 		{
 			AA.init(HH,mass,vv(iv)+randn()*(0.5/sigma_x)/mass,xstart+randn()*sigma_x,state,-xend,xend);
-			EE.init_psi(psi0);
+			EE.init_rho(rho0,HH,beta);
 			// run fssh
 			for (int t1=0; t1<24000; t1++)
 			{
-				AA.move_with_bath(HH);
-				EE.evolve_with_bath_v2(HH,AA);
+				AA.move(HH);
+				EE.evolve(HH,AA);
+				EE.fit_drho_v1(HH,AA);
 				//EE.try_decoherence(AA);
-				AA.try_hop_with_bath_state2(HH,EE.rho);
-				//AA.print_rate(x,HH,EE.rho);
-				//cout<<x(AA.ind_new)<<'\t'<<AA.v_new<<endl;
+				AA.try_hop(HH,EE.rho_fock_old,EE.hop_bath);
 				if (abs(AA.check_stop()))
 					break;
 			}
-			// TODO istate changes one the right side of the potential when B increases
-			// perhaps need to align them?
 			// count rate
 			if (x(AA.ind_new) < 0)
 				counter_r(AA.istate) += 1.0;
@@ -91,7 +95,7 @@ int main()
 				counter_t(AA.istate) += 1.0;
 		}
 		// collect counting
-		for (int t1=0; t1<HH.dim; t1++)
+		for (int t1=0; t1<HH.sz_fock; t1++)
 		{
 			tmp = counter_t(t1);
 			MPI_Allreduce(&tmp,&tmp2,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
@@ -107,11 +111,11 @@ int main()
 		if (rank == 0)
 		{
 			cout<<vv(iv)*vv(iv)*mass/2;
-			for (int t1=0; t1<HH.dim; t1++)
+			for (int t1=0; t1<HH.sz_fock; t1++)
 				cout<<'\t'<<counter_t(t1)/sample_myself/size;
-			for (int t1=0; t1<HH.dim; t1++)
+			for (int t1=0; t1<HH.sz_fock; t1++)
 				cout<<'\t'<<counter_r(t1)/sample_myself/size;
-			cout<<'\t'<<ave_hops/sample_myself/size<<endl;
+			//cout<<'\t'<<ave_hops/sample_myself/size<<endl;
 		}
 	}
 	MPI_Finalize();
