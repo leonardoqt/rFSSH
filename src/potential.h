@@ -8,7 +8,7 @@ class potential; // time independent part
 class potential
 {
 private:
-	const int nbath = 1300;
+	const int nbath = 100;
 	const double dep_bath = 3.0;
 public:
 	const int sz_s = 2;

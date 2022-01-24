@@ -181,7 +181,7 @@ void electronic::fit_drho_v2(potential& HH, ionic& AA)
 	cx_mat M = join_horiz(rho_dot0.as_col(),rho_dot1.as_col(),rho_dot2.as_col(),rho_dot3.as_col());
 	mat MM = real(M.t()*M);
 	vec MV = real(M.t()*V);
-	vec Lambda = pinv(MM)*MV;
+	vec Lambda = pinv(MM+1e-8*eye(4,4))*MV;
 	//reshape(V,4,4).print("target");
 	//reshape(M*Lambda-V,4,4).print("res");
 	//exit(EXIT_FAILURE);
@@ -192,6 +192,12 @@ void electronic::fit_drho_v2(potential& HH, ionic& AA)
 	hop_bath(2,3) = Lambda(1)*exp(-beta*HH.eigval_s(0,AA.ind_pre)); hop_bath(3,2) = Lambda(1);
 	hop_bath(0,2) = Lambda(2)*exp(-beta*HH.eigval_s(1,AA.ind_pre)); hop_bath(2,0) = Lambda(2);
 	hop_bath(1,3) = Lambda(3)*exp(-beta*HH.eigval_s(1,AA.ind_pre)); hop_bath(3,1) = Lambda(3);
+	//vec eigval;
+	//mat tmp;
+	//eig_sym(eigval,tmp,MM);
+	//cout<<eigval(0)<<'\t'<<Lambda(1)<<'\t'<<Lambda(2)<<'\t'<<Lambda(3)<<'\t'<<eigval(0)<<'\t'<<eigval(1)<<'\t'<<eigval(2)<<'\t'<<eigval(3)<<endl;
+	//real(drho_2fit.diag()).t().print();
+	//real(rho_fock.diag()).t().print();
 }
 
 

@@ -4,17 +4,22 @@
 #include "electronic.h"
 #include <mpi.h>
 #include <time.h>
+#include <chrono>
 
 using namespace std;
 using namespace arma;
 
 int main()
 {
+	typedef chrono::high_resolution_clock clock;
+	typedef chrono::high_resolution_clock::time_point timepoint;
+	timepoint past;
+	timepoint now = clock::now();
 	MPI_Init(NULL,NULL);
 	int rank, size;
 	MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 	MPI_Comm_size(MPI_COMM_WORLD,&size);
-	arma_rng::set_seed(time(0)+rank*10);
+	arma_rng::set_seed(now.time_since_epoch().count()+rank*10);
 	//
 	double E1 = -0.1, E2 = -0.11, vdd = 0.04;
 	double gamma1 = 0.02, gamma2 = 0.0;
@@ -23,7 +28,7 @@ int main()
 	//
 	double ek0 = 1e-3, ek1 = 1e-1;
 	// TODO: for now impose start from no population on impurities. need to decide which state to start if having initila population
-	// TODO: to avoid recurrence of the bath, need ek > 1e-1, need to think about how to avoid this
+	// TODO: to avoid recurrence of the bath (which is around 2*pi*dos?), need ek > 1e-1, need to think about how to avoid this
 	int nek = 60, state = 0;
 	int sample = 10000;
 	//
@@ -61,8 +66,14 @@ int main()
 	//
 	sample_myself = sample / size;
 	//
+	past = clock::now();
 	HH.generate_H(x,E1,E2,vdd,gamma1,gamma2);
+	now = clock::now();
+	if (rank == 0) cout<<"time for gen is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
+	past = clock::now();
 	HH.diag_H();
+	now = clock::now();
+	if (rank == 0) cout<<"time for diag is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl<<endl;
 	////
 	//if (rank ==0)
 	//	for(uword t1=0; t1< x.n_elem; t1++)
@@ -79,13 +90,26 @@ int main()
 			AA.init(HH,mass,vv(iv)+randn()*(0.5/sigma_x)/mass,xstart+randn()*sigma_x,state,-xend,xend);
 			EE.init_rho(rho0,HH,beta);
 			// run fssh
-			for (int t1=0; t1<24000; t1++)
+			for (int t1=0; t1<2400; t1++)
 			{
+	past = clock::now();
 				AA.move(HH);
+	now = clock::now();
+	if (rank == 0) cout<<"time for move is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
 				EE.evolve(HH,AA);
+	past = clock::now();
+	now = clock::now();
+	if (rank == 0) cout<<"time for evolve is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
+				//cout<<t1<<'\t';
 				EE.fit_drho_v2(HH,AA);
+	past = clock::now();
+	now = clock::now();
+	if (rank == 0) cout<<"time for fit is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
 				//EE.try_decoherence(AA);
 				AA.try_hop(HH,EE.rho_fock_old,EE.hop_bath);
+	past = clock::now();
+	now = clock::now();
+	if (rank == 0) cout<<"time for hop is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
 				if (abs(AA.check_stop()))
 					break;
 			}
