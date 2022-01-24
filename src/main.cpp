@@ -96,25 +96,25 @@ int main()
 	past = clock::now();
 				AA.move(HH);
 	now = clock::now();
-	if (rank == 0) cout<<"time for move is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
+	if (rank == t1%size) cout<<rank<<":  time for move is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
 				EE.evolve(HH,AA);
 	past = clock::now();
 	now = clock::now();
-	if (rank == 0) cout<<"time for evolve is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
+	if (rank == t1%size) cout<<rank<<":  time for evolve is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
 				//cout<<t1<<'\t';
 				EE.fit_drho_v2(HH,AA);
 	past = clock::now();
 	now = clock::now();
-	if (rank == 0) cout<<"time for fit is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
+	if (rank == t1%size) cout<<rank<<":  time for fit is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
 				//EE.try_decoherence(AA);
 				AA.try_hop(HH,EE.rho_fock_old,EE.hop_bath);
 	past = clock::now();
 	now = clock::now();
-	if (rank == 0) cout<<"time for hop is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
+	if (rank == t1%size) cout<<rank<<":  time for hop is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
 				if (abs(AA.check_stop()))
 					break;
 	loop1 = clock::now();
-	if (rank == 0) cout<<"time for one loop is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
+	if (rank == t1%size) cout<<rank<<":  time for one loop is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<"   "<<AA.ind_new<<endl<<endl;
 			}
 			// count rate
 			if (x(AA.ind_new) < 0)
