@@ -13,7 +13,7 @@ int main()
 {
 	typedef chrono::high_resolution_clock clock;
 	typedef chrono::high_resolution_clock::time_point timepoint;
-	timepoint past;
+	timepoint past, loop0, loop1;
 	timepoint now = clock::now();
 	MPI_Init(NULL,NULL);
 	int rank, size;
@@ -92,6 +92,7 @@ int main()
 			// run fssh
 			for (int t1=0; t1<2400; t1++)
 			{
+	loop0 = clock::now();
 	past = clock::now();
 				AA.move(HH);
 	now = clock::now();
@@ -112,6 +113,8 @@ int main()
 	if (rank == 0) cout<<"time for hop is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
 				if (abs(AA.check_stop()))
 					break;
+	loop1 = clock::now();
+	if (rank == 0) cout<<"time for one loop is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
 			}
 			// count rate
 			if (x(AA.ind_new) < 0)
