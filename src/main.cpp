@@ -13,7 +13,7 @@ int main()
 {
 	typedef chrono::high_resolution_clock clock;
 	typedef chrono::high_resolution_clock::time_point timepoint;
-	timepoint past, loop0, loop1;
+	timepoint past, loop0, loop1, run0, run1;
 	timepoint now = clock::now();
 	MPI_Init(NULL,NULL);
 	int rank, size;
@@ -66,6 +66,7 @@ int main()
 	//
 	sample_myself = sample / size;
 	//
+	if (rank == 0) cout<<E1<<' '<<E2<<' '<<vdd<<' '<<gamma1<<' '<<gamma2<<' '<<ek0<<' '<<ek1<<' '<<nek<<' '<<sample<<endl;
 	past = clock::now();
 	HH.generate_H(x,E1,E2,vdd,gamma1,gamma2);
 	now = clock::now();
@@ -85,6 +86,7 @@ int main()
 	{
 		counter_t = counter_t*0;
 		counter_r = counter_r*0;
+	run0 = clock::now();
 		for (int t0=0; t0<sample_myself;t0++)
 		{
 			AA.init(HH,mass,vv(iv)+randn()*(0.5/sigma_x)/mass,xstart+randn()*sigma_x,state,-xend,xend);
@@ -97,24 +99,23 @@ int main()
 				AA.move(HH);
 	now = clock::now();
 	if (rank == t1%size) cout<<rank<<":  time for move is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
-				EE.evolve(HH,AA);
 	past = clock::now();
+				EE.evolve(HH,AA);
 	now = clock::now();
 	if (rank == t1%size) cout<<rank<<":  time for evolve is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
-				//cout<<t1<<'\t';
-				EE.fit_drho_v2(HH,AA);
 	past = clock::now();
+				EE.fit_drho_v2(HH,AA);
 	now = clock::now();
 	if (rank == t1%size) cout<<rank<<":  time for fit is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
+	past = clock::now();
 				//EE.try_decoherence(AA);
 				AA.try_hop(HH,EE.rho_fock_old,EE.hop_bath);
-	past = clock::now();
 	now = clock::now();
 	if (rank == t1%size) cout<<rank<<":  time for hop is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
 				if (abs(AA.check_stop()))
 					break;
 	loop1 = clock::now();
-	if (rank == t1%size) cout<<rank<<":  time for one loop is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<"   "<<AA.ind_new<<endl<<endl;
+	if (rank == t1%size) cout<<rank<<":  time for one loop is "<<(loop1.time_since_epoch().count() - loop0.time_since_epoch().count())/1e9<<'s'<<"   "<<AA.ind_new<<endl<<endl;
 			}
 			// count rate
 			if (x(AA.ind_new) < 0)
@@ -122,6 +123,8 @@ int main()
 			else
 				counter_t(AA.istate) += 1.0;
 		}
+	run1 = clock::now();
+	if (rank == 0) cout<<rank<<":  time for one traj. is "<<(run1.time_since_epoch().count() - run0.time_since_epoch().count())/1e9<<'s'<<"   "<<AA.ind_new<<endl<<endl;
 		// collect counting
 		for (int t1=0; t1<HH.sz_fock; t1++)
 		{
