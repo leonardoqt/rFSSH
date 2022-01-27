@@ -37,24 +37,9 @@ void electronic::evolve(potential& HH, ionic& AA)
 	mat U_t = HH.eigvec_t.slice(AA.ind_pre);
 	mat U_s = HH.eigvec_s.slice(AA.ind_pre);
 	mat U_s2= HH.eigvec_s.slice(AA.ind_new);
-	cx_mat d0_da = U_t.t() * cx_mat(eye(HH.sz_t,HH.sz_s),zeros<mat>(HH.sz_t,HH.sz_s));
-	cx_mat N0_a = U_t.t() * N_t * U_t;
-	cx_mat dt_da = d0_da;
-	cx_vec phase = exp(ii*HH.eigval_t.col(AA.ind_pre)*AA.dt);
-	//cout<<AA.dt<<endl;
-	//d0_da.print("d0_da");
-	//N0_a.print("N0_a");
-	//phase.print("phase");
-	//exit(EXIT_FAILURE);
-	for (int t1=0; t1<HH.sz_t; t1++)
-		dt_da.row(t1) = phase(t1) * d0_da.row(t1);
 	// TODO: make sure we want the new adiabats (after dt not before dt, which is U_s)
-	cx_mat dt_aa = dt_da * U_s2;
-	//
-	// N_s
-	N_s = dt_aa.t() * N0_a * dt_aa;
-	//N_s.print();
-	//exit(EXIT_FAILURE);
+	cx_mat d0_ad = cx_mat(eye(HH.sz_t,HH.sz_s),zeros<mat>(HH.sz_t,HH.sz_s)) * U_s2;
+	cx_vec phase = exp(ii*HH.eigval_t.col(AA.ind_pre)*AA.dt);
 	//
 	// N_t
 	cx_mat U_t_phase = zeros<cx_mat>(HH.sz_t,HH.sz_t);
@@ -62,6 +47,9 @@ void electronic::evolve(potential& HH, ionic& AA)
 		U_t_phase.col(t1) = phase(t1) * U_t.col(t1);
 	cx_mat EHT = U_t_phase * U_t.t();
 	N_t = EHT.t() * N_t * EHT;
+	//
+	// N_s
+	N_s = d0_ad.t() * N_t * d0_ad;
 	//
 	// rho_fock and drho
 	rho_fock_old = rho_fock;
