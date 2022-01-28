@@ -9,7 +9,7 @@ class potential
 {
 private:
 	const int nbath = 100;
-	const double dep_bath = 3.0;
+	const double dep_bath = 0.3;
 public:
 	const int sz_s = 2;
 	const int sz_fock = 4; // this is 2^dim
