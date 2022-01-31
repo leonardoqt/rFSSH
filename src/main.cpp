@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include "potential.h"
 #include "ionic.h"
 #include "electronic.h"
@@ -54,7 +55,7 @@ int main()
 	double mass = 2000;
 	double xstart = -6;
 	double xend = 6;
-	double sigma_x = 0.5;
+	//double sigma_x = 0.5;
 	//
 	int sample_myself;
 	double tmp,tmp2;
@@ -63,6 +64,8 @@ int main()
 	//
 	vec vv = linspace(sqrt(2*ek0/mass),sqrt(2*ek1/mass),nek);
 	vec counter_t(HH.sz_fock,fill::zeros), counter_r(HH.sz_fock,fill::zeros);
+	mat mytraj(x.n_rows,HH.sz_fock,fill::zeros);
+	mat tottraj(x.n_rows,HH.sz_fock,fill::zeros);
 	//
 	sample_myself = sample / size;
 	//
@@ -86,10 +89,14 @@ int main()
 	{
 		counter_t = counter_t*0;
 		counter_r = counter_r*0;
+		mytraj.zeros();
+		tottraj.zeros();
 	//run0 = clock::now();
-		for (int t0=0; t0<sample_myself;t0++)
+		for (int isample=0; isample<sample_myself;isample++)
 		{
-			AA.init(HH,mass,vv(iv)+randn()*(0.5/sigma_x)/mass,xstart+randn()*sigma_x,state,-xend,xend);
+			//TODO: no rand for testing
+			//AA.init(HH,mass,vv(iv)+randn()*(0.5/sigma_x)/mass,xstart+randn()*sigma_x,state,-xend,xend);
+			AA.init(HH,mass,vv(iv),xstart,state,-xend,xend);
 			EE.init_rho(rho0,HH,beta);
 			// run fssh
 			for (int t1=0; t1<2400; t1++)
@@ -97,6 +104,7 @@ int main()
 	//loop0 = clock::now();
 	//past = clock::now();
 				AA.move(HH);
+				mytraj(AA.ind_pre,AA.istate) += 1.0;
 	//now = clock::now();
 	//if (rank == t1%size) cout<<rank<<":  time for move is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
 	//past = clock::now();
@@ -104,7 +112,8 @@ int main()
 	//now = clock::now();
 	//if (rank == t1%size) cout<<rank<<":  time for evolve is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
 	//past = clock::now();
-				EE.fit_drho_v2(HH,AA);
+				//cout<<t1*AA.dt<<'\t';
+				EE.fit_drho_v1(HH,AA);
 	//now = clock::now();
 	//if (rank == t1%size) cout<<rank<<":  time for fit is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
 	//past = clock::now();
@@ -128,6 +137,16 @@ int main()
 		// collect counting
 		for (int t1=0; t1<HH.sz_fock; t1++)
 		{
+			double* tmptraj = new double[x.n_rows];
+			double* tmptrajsum = new double[x.n_rows];
+			for (size_t t2=0; t2<x.n_rows; t2++)
+				tmptraj[t2] = mytraj(t2,t1);
+			MPI_Allreduce(tmptraj,tmptrajsum,x.n_rows,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+			for (size_t t2=0; t2<x.n_rows; t2++)
+				tottraj(t2,t1) = tmptrajsum[t2];
+			delete[] tmptraj;
+			delete[] tmptrajsum;
+			//
 			tmp = counter_t(t1);
 			MPI_Allreduce(&tmp,&tmp2,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 			counter_t(t1) = tmp2;
@@ -141,6 +160,17 @@ int main()
 		// print
 		if (rank == 0)
 		{
+			ofstream ff;
+			ff.open("traj_"+to_string(iv)+".dat");
+			for(size_t t1=0; t1<x.n_rows; t1++)
+			{
+				ff<<(x(t1)-xstart)/vv(iv);
+				for(int t2=0; t2<HH.sz_fock; t2++)
+					ff<<'\t'<<tottraj(t1,t2)/sample_myself/size;
+				ff<<endl;
+			}
+			ff.close();
+			//
 			cout<<vv(iv)*vv(iv)*mass/2;
 			for (int t1=0; t1<HH.sz_fock; t1++)
 				cout<<'\t'<<counter_t(t1)/sample_myself/size;
