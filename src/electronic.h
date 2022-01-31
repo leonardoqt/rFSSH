@@ -17,8 +17,9 @@ public:
 	//
 	void init_rho(arma::mat rho0_s, potential& HH, double Beta);
 	void evolve(potential& HH, ionic& AA); // update N_t, N_s
-	void fit_drho_v1(potential& HH, ionic& AA); // impose single-orbital jump the same, fit everything
-	void fit_drho_v2(potential& HH, ionic& AA); // only impose detailed balance
+	void fit_drho_v1(potential& HH, ionic& AA); // impose detailed balance, fit only diagonal
+	void fit_drho_v2(potential& HH, ionic& AA); // impose detailed balance, fit full matrix
+	void fit_drho_v3(potential& HH, ionic& AA); // impose single orbital the same, fit only diagonal
 	//void try_decoherence(ionic& AA);
 };
 #endif

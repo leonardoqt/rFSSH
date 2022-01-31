@@ -121,10 +121,9 @@ void electronic::fit_drho_v1(potential& HH, ionic& AA)
 	M = M.rows(0,2);
 	mat MM = M.t()*M;
 	vec MV = M.t()*V;
-	vec Lambda = solve(MM+eye(4,4)*norm(MM)*1e-3,MV);
-	//reshape(V,4,4).print("target");
-	//reshape(M*Lambda-V,4,4).print("res");
-	//exit(EXIT_FAILURE);
+	vec Lambda = solve(MM+eye(4,4)*norm(MM)*1e-6,MV);
+	//V.t().print("target");
+	//(M*Lambda-V).t().print("res");
 	//
 	// put results into hop_bath, where hop_bath(i,j) is from i to j, i.e., |j><i|
 	hop_bath = zeros<mat>(4,4);
@@ -132,13 +131,7 @@ void electronic::fit_drho_v1(potential& HH, ionic& AA)
 	hop_bath(2,3) = Lambda(1)*exp(-beta*HH.eigval_s(0,AA.ind_pre)); hop_bath(3,2) = Lambda(1);
 	hop_bath(0,2) = Lambda(2)*exp(-beta*HH.eigval_s(1,AA.ind_pre)); hop_bath(2,0) = Lambda(2);
 	hop_bath(1,3) = Lambda(3)*exp(-beta*HH.eigval_s(1,AA.ind_pre)); hop_bath(3,1) = Lambda(3);
-	Lambda.t().print();
-	//vec eigval;
-	//mat tmp;
-	//eig_sym(eigval,tmp,MM);
-	//cout<<eigval(0)<<'\t'<<Lambda(1)<<'\t'<<Lambda(2)<<'\t'<<Lambda(3)<<'\t'<<eigval(0)<<'\t'<<eigval(1)<<'\t'<<eigval(2)<<'\t'<<eigval(3)<<endl;
-	//real(drho_2fit.diag()).t().print();
-	//real(rho_fock.diag()).t().print();
+	//Lambda.t().print();
 }
 
 
@@ -201,6 +194,63 @@ void electronic::fit_drho_v2(potential& HH, ionic& AA)
 	//cout<<eigval(0)<<'\t'<<Lambda(1)<<'\t'<<Lambda(2)<<'\t'<<Lambda(3)<<'\t'<<eigval(0)<<'\t'<<eigval(1)<<'\t'<<eigval(2)<<'\t'<<eigval(3)<<endl;
 	//real(drho_2fit.diag()).t().print();
 	//real(rho_fock.diag()).t().print();
+}
+
+void electronic::fit_drho_v3(potential& HH, ionic& AA)
+{
+	//
+	//   0,  1,  2,  3,  4,  5,  6,  7
+	// L01,L10,L23,L32,L02,L20,L13,L31;
+	// L01 -> |0><1|, which hops from 1 to 0
+	cube LL(4,4,8,fill::zeros);
+	mat L;
+	LL(0,1,0) = LL(1,0,1) = LL(2,3,2) = LL(3,2,3) = 1;
+	LL(0,2,4) = LL(2,0,5) = LL(1,3,6) = LL(3,1,7) = 1;
+	//
+	cx_mat rho_dot0(4,4,fill::zeros);
+	cx_mat rho_dot1(4,4,fill::zeros);
+	cx_mat rho_dot2(4,4,fill::zeros);
+	cx_mat rho_dot3(4,4,fill::zeros);
+	// lambda_01/lambda_10 = exp(beta*E), i.e.,
+	// lambda_10 = lambda_01 * exp(-beta*E)
+	L = LL.slice(0);
+	rho_dot0 += L*rho_fock_old*L.t() - (L.t()*L*rho_fock_old + rho_fock_old*L.t()*L)/2;
+	L = LL.slice(2);
+	rho_dot0 += L*rho_fock_old*L.t() - (L.t()*L*rho_fock_old + rho_fock_old*L.t()*L)/2;
+	L = LL.slice(1);
+	rho_dot1 += L*rho_fock_old*L.t() - (L.t()*L*rho_fock_old + rho_fock_old*L.t()*L)/2;
+	L = LL.slice(3);
+	rho_dot1 += L*rho_fock_old*L.t() - (L.t()*L*rho_fock_old + rho_fock_old*L.t()*L)/2;
+	//
+	L = LL.slice(4);
+	rho_dot2 += L*rho_fock_old*L.t() - (L.t()*L*rho_fock_old + rho_fock_old*L.t()*L)/2;
+	L = LL.slice(6);
+	rho_dot2 += L*rho_fock_old*L.t() - (L.t()*L*rho_fock_old + rho_fock_old*L.t()*L)/2;
+	L = LL.slice(5);
+	rho_dot3 += L*rho_fock_old*L.t() - (L.t()*L*rho_fock_old + rho_fock_old*L.t()*L)/2;
+	L = LL.slice(7);
+	rho_dot3 += L*rho_fock_old*L.t() - (L.t()*L*rho_fock_old + rho_fock_old*L.t()*L)/2;
+	//
+	// fitting: write rho as a column vector, V = drho_2fit, M = [rho_dot1, rho_dot2]
+	// then Lambda = (M\dagger M)^(-1)*Re(M\dagger V), where Lambda = [l1; l2]
+	vec V = real(drho_2fit.diag());
+	mat M = real(join_horiz(rho_dot0.diag(),rho_dot1.diag(),rho_dot2.diag(),rho_dot3.diag()));
+	V = V.rows(0,2);
+	M = M.rows(0,2);
+	mat MM = M.t()*M;
+	vec MV = M.t()*V;
+	vec Lambda = solve(MM+eye(4,4)*norm(MM)*1e-12,MV);
+	//V.t().print("target");
+	//(M*Lambda-V).t().print("res");
+	//exit(EXIT_FAILURE);
+	//
+	// put results into hop_bath, where hop_bath(i,j) is from i to j, i.e., |j><i|
+	hop_bath = zeros<mat>(4,4);
+	hop_bath(1,0) = hop_bath(3,2) = Lambda(0);
+	hop_bath(0,1) = hop_bath(2,3) = Lambda(1);
+	hop_bath(2,0) = hop_bath(3,1) = Lambda(2);
+	hop_bath(0,2) = hop_bath(1,3) = Lambda(3);
+	//Lambda.t().print();
 }
 
 
