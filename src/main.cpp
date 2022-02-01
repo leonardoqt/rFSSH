@@ -66,6 +66,8 @@ int main()
 	vec counter_t(HH.sz_fock,fill::zeros), counter_r(HH.sz_fock,fill::zeros);
 	mat mytraj(x.n_rows,HH.sz_fock,fill::zeros);
 	mat tottraj(x.n_rows,HH.sz_fock,fill::zeros);
+	vec myhop(x.n_rows,fill::zeros);
+	vec tothop(x.n_rows,fill::zeros);
 	//
 	sample_myself = sample / size;
 	//
@@ -89,8 +91,11 @@ int main()
 	{
 		counter_t = counter_t*0;
 		counter_r = counter_r*0;
+		ave_hops = 0;
 		mytraj.zeros();
 		tottraj.zeros();
+		myhop.zeros();
+		tothop.zeros();
 	//run0 = clock::now();
 		for (int isample=0; isample<sample_myself;isample++)
 		{
@@ -105,6 +110,7 @@ int main()
 	//past = clock::now();
 				AA.move(HH);
 				mytraj(AA.ind_pre,AA.istate) += 1.0;
+				myhop(AA.ind_pre) = AA.nhops;
 	//now = clock::now();
 	//if (rank == t1%size) cout<<rank<<":  time for move is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
 	//past = clock::now();
@@ -113,7 +119,7 @@ int main()
 	//if (rank == t1%size) cout<<rank<<":  time for evolve is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
 	//past = clock::now();
 				//cout<<t1*AA.dt<<'\t';
-				EE.fit_drho_v3(HH,AA);
+				EE.fit_drho_v1(HH,AA);
 	//now = clock::now();
 	//if (rank == t1%size) cout<<rank<<":  time for fit is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
 	//past = clock::now();
@@ -154,6 +160,14 @@ int main()
 			MPI_Allreduce(&tmp,&tmp2,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 			counter_r(t1) = tmp2;
 		}
+		double* tmphop = new double[x.n_rows];
+		double* tmphopsum = new double[x.n_rows];
+		for (size_t t2=0; t2<x.n_rows; t2++)
+			tmphop[t2] = myhop(t2);
+		MPI_Allreduce(tmphop,tmphopsum,x.n_rows,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+		for (size_t t2=0; t2<x.n_rows; t2++)
+			tothop(t2) = tmphopsum[t2];
+		//
 		tmpi = AA.nhops;
 		MPI_Allreduce(&tmpi,&tmpi2,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
 		ave_hops = ave_hops + tmpi2;
@@ -163,12 +177,19 @@ int main()
 			ofstream ff;
 			ff.open("traj_"+to_string(iv)+".dat");
 			for(size_t t1=0; t1<x.n_rows; t1++)
-			{
-				ff<<(x(t1)-xstart)/vv(iv);
-				for(int t2=0; t2<HH.sz_fock; t2++)
-					ff<<'\t'<<tottraj(t1,t2)/sample_myself/size;
-				ff<<endl;
-			}
+				if (x(t1) >= xstart && x(t1) <= xend)
+				{
+					ff<<(x(t1)-xstart)/vv(iv);
+					for(int t2=0; t2<HH.sz_fock; t2++)
+						ff<<'\t'<<tottraj(t1,t2)/sample_myself/size;
+					ff<<endl;
+				}
+			ff.close();
+			//
+			ff.open("hop_"+to_string(iv)+".dat");
+			for(size_t t1=0; t1<x.n_rows; t1++)
+				if (x(t1) >= xstart && x(t1) <= xend)
+					ff<<(x(t1)-xstart)/vv(iv)<<'\t'<<tothop(t1)/sample_myself/size<<endl;
 			ff.close();
 			//
 			cout<<vv(iv)*vv(iv)*mass/2;
@@ -176,8 +197,8 @@ int main()
 				cout<<'\t'<<counter_t(t1)/sample_myself/size;
 			for (int t1=0; t1<HH.sz_fock; t1++)
 				cout<<'\t'<<counter_r(t1)/sample_myself/size;
-			cout<<endl;
-			//cout<<'\t'<<ave_hops/sample_myself/size<<endl;
+			//cout<<endl;
+			cout<<'\t'<<ave_hops/sample_myself/size<<endl;
 		}
 	}
 	MPI_Finalize();

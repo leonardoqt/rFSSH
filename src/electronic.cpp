@@ -122,6 +122,7 @@ void electronic::fit_drho_v1(potential& HH, ionic& AA)
 	mat MM = M.t()*M;
 	vec MV = M.t()*V;
 	vec Lambda = solve(MM+eye(4,4)*norm(MM)*1e-6,MV);
+	//cout<<norm(M*Lambda-V)/norm(V)<<endl;
 	//V.t().print("target");
 	//(M*Lambda-V).t().print("res");
 	//
@@ -240,6 +241,7 @@ void electronic::fit_drho_v3(potential& HH, ionic& AA)
 	mat MM = M.t()*M;
 	vec MV = M.t()*V;
 	vec Lambda = solve(MM+eye(4,4)*norm(MM)*1e-12,MV);
+	//cout<<norm(M*Lambda-V)/norm(V)<<endl;
 	//V.t().print("target");
 	//(M*Lambda-V).t().print("res");
 	//exit(EXIT_FAILURE);
