@@ -59,7 +59,6 @@ int main()
 	//
 	int sample_myself;
 	double tmp,tmp2;
-	int tmpi, tmpi2;
 	double ave_hops=0.0;
 	//
 	vec vv = linspace(sqrt(2*ek0/mass),sqrt(2*ek1/mass),nek);
@@ -71,11 +70,7 @@ int main()
 	//
 	sample_myself = sample / size;
 	//
-	//if (rank == 0) cout<<E1<<' '<<E2<<' '<<vdd<<' '<<gamma1<<' '<<gamma2<<' '<<ek0<<' '<<ek1<<' '<<nek<<' '<<sample<<endl;
-	//past = clock::now();
 	HH.generate_H(x,E1,E2,vdd,gamma1,gamma2);
-	//now = clock::now();
-	//if (rank == 0) cout<<"time for gen is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
 	//past = clock::now();
 	HH.diag_H();
 	//now = clock::now();
@@ -110,7 +105,7 @@ int main()
 	//past = clock::now();
 				AA.move(HH);
 				mytraj(AA.ind_pre,AA.istate) += 1.0;
-				myhop(AA.ind_pre) = AA.nhops;
+				myhop(AA.ind_pre) += AA.nhops;
 	//now = clock::now();
 	//if (rank == t1%size) cout<<rank<<":  time for move is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
 	//past = clock::now();
@@ -137,6 +132,7 @@ int main()
 				counter_r(AA.istate) += 1.0;
 			else
 				counter_t(AA.istate) += 1.0;
+			ave_hops += AA.nhops;
 		}
 	//run1 = clock::now();
 	//if (rank == 0) cout<<rank<<":  time for one traj. is "<<(run1.time_since_epoch().count() - run0.time_since_epoch().count())/1e9<<'s'<<"   "<<AA.ind_new<<endl<<endl;
@@ -168,9 +164,9 @@ int main()
 		for (size_t t2=0; t2<x.n_rows; t2++)
 			tothop(t2) = tmphopsum[t2];
 		//
-		tmpi = AA.nhops;
-		MPI_Allreduce(&tmpi,&tmpi2,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
-		ave_hops = ave_hops + tmpi2;
+		tmp = AA.nhops;
+		MPI_Allreduce(&tmp,&tmp2,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+		ave_hops = tmp2;
 		// print
 		if (rank == 0)
 		{
