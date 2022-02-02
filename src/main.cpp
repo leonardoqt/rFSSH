@@ -164,7 +164,7 @@ int main()
 		for (size_t t2=0; t2<x.n_rows; t2++)
 			tothop(t2) = tmphopsum[t2];
 		//
-		tmp = AA.nhops;
+		tmp = ave_hops;
 		MPI_Allreduce(&tmp,&tmp2,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 		ave_hops = tmp2;
 		// print
