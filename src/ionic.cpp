@@ -147,14 +147,12 @@ void ionic::try_hop(potential& HH, cx_mat& rho, mat& hop_bath)
 		else
 		{
 			rate_s(t1) = real( T(istate,t1)*rho(t1,istate) ) * 2 / real(rho(istate,istate));
-			rate_b(t1) = 0;
-			if (hop_bath(istate,t1) > 0)
-				rate_b(t1) += hop_bath(istate,t1) * dt;
-			if (hop_bath(t1,istate) < 0)
-				rate_b(t1) -= hop_bath(t1,istate) * dt * real(rho(t1,t1)) / real(rho(istate,istate));
+			rate_b(t1) = ( hop_bath(istate,t1)*real(rho(istate,istate))-hop_bath(t1,istate)*real(rho(t1,t1)) )/real(rho(istate,istate)) * dt;
 		}
 		if (rate_s(t1) < 0)
 			rate_s(t1) = 0;
+		if (rate_b(t1) < 0)
+			rate_b(t1) = 0;
 		if (ek + HH.H_fock(istate,ind_pre) < HH.H_fock(t1,ind_pre))
 			rate_s(t1) = 0;
 	}
