@@ -18,8 +18,8 @@ public:
 	double mass, ek, v_pre, v_new;
 	double dt;
 	//
-	void init(potential& pp, double Mass, double vv, double xx, int state, double xl, double xr);
-	void move(potential& pp);
+	void init(potential& HH, double Mass, double vv, double xx, int state, double xl, double xr);
+	void move(potential& HH);
 	void try_hop(potential& pp, arma::cx_mat& rho, arma::mat& hop_bath);
 	void print_rate(arma::vec& xx, potential& pp, arma::cx_mat& rho);
 	int check_stop();

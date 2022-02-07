@@ -10,7 +10,7 @@ void electronic::init_rho(mat rho0_s, potential& HH, double Beta)
 	vec N_b = 1/(1+exp(beta * HH.Eb));
 	N_t = zeros<cx_mat>(HH.sz_t,HH.sz_t);
 	N_s = zeros<cx_mat>(HH.sz_s,HH.sz_s);
-	rho_fock = zeros<cx_mat>(HH.sz_fock,HH.sz_fock);
+	rho_fock = zeros<cx_mat>(HH.sz_f,HH.sz_f);
 	N_t.diag() = cx_vec (join_vert(zeros<vec>(HH.sz_s),N_b),zeros<vec>(HH.sz_t) );
 	N_t(span(0,1),span(0,1)) = cx_mat (rho0_s,zeros<mat>(HH.sz_s,HH.sz_s));
 	//
@@ -25,7 +25,7 @@ void electronic::init_rho(mat rho0_s, potential& HH, double Beta)
 	//
 	rho_fock_old = rho_fock;
 	//
-	hop_bath = zeros<mat>(HH.sz_fock,HH.sz_fock);
+	hop_bath = zeros<mat>(HH.sz_f,HH.sz_f);
 	//real(N_s).print("N_s");
 	//real(N_t).print("N_t");
 	//real(rho_fock).print("rho_fock");
@@ -67,7 +67,7 @@ void electronic::evolve(potential& HH, ionic& AA)
 	//
 	// drho_2fit, it equals drho/dt + i[H, rho] + [T, rho]
 	// the evolution use H old, but basis transform should be avarged
-	mat hh = diagmat(HH.H_fock.col(AA.ind_pre));
+	mat hh = diagmat(HH.E_f.col(AA.ind_pre));
 	mat dd = (HH.dd.slice(AA.ind_pre) + HH.dd.slice(AA.ind_new))/2;
 	drho_2fit  = drho;
 	//drho_2fit.print("drho2fit");
@@ -199,6 +199,8 @@ void electronic::fit_drho_v2(potential& HH, ionic& AA)
 
 void electronic::fit_drho_v3(potential& HH, ionic& AA)
 {
+	// the jump operator corresponding to the same single-electron
+	// hops can be merged if only looking at the diagonal of rho
 	//
 	//   0,  1,  2,  3,  4,  5,  6,  7
 	// L01,L10,L23,L32,L02,L20,L13,L31;

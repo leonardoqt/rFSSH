@@ -6,7 +6,6 @@ using namespace arma;
 
 void potential::generate_H(vec X, double E1, double E2, double vdd, double gamma1, double gamma2)
 {
-	sz_t = sz_s + nbath;
 	x = X;
 	dx = x(1) - x(0);
 	nx = x.n_rows;
@@ -43,9 +42,9 @@ void potential::diag_H()
 	eigvec_s = cube(sz_s,sz_s,nx,fill::zeros);
 	eigval_t = mat(sz_t,nx,fill::zeros);
 	eigval_s = mat(sz_s,nx,fill::zeros);
-	H_fock   = mat(sz_fock,nx,fill::zeros);
-	F        = mat(sz_fock,nx,fill::zeros);
-	dd       = cube(sz_fock,sz_fock,nx,fill::zeros);
+	E_f      = mat(sz_f,nx,fill::zeros);
+	F_f      = mat(sz_f,nx,fill::zeros);
+	dd       = cube(sz_f,sz_f,nx,fill::zeros);
 	//
 	for(int t1=0; t1<nx; t1++)
 	{
@@ -63,17 +62,17 @@ void potential::diag_H()
 				eigvec_s.slice(t2).col(t1) *= -1;
 		}
 	}
-	// H_fock
+	// E_f
 	for(int t1=0; t1<nx; t1++)
 	{
-		H_fock(0,t1) = 0;
-		H_fock(1,t1) = eigval_s(0,t1);
-		H_fock(2,t1) = eigval_s(1,t1);
-		H_fock(3,t1) = H_fock(1,t1) + H_fock(2,t1);
+		E_f(0,t1) = 0;
+		E_f(1,t1) = eigval_s(0,t1);
+		E_f(2,t1) = eigval_s(1,t1);
+		E_f(3,t1) = E_f(1,t1) + E_f(2,t1);
 	}
 	// force
 	for(int t1=1; t1<nx-1; t1++)
-		F.col(t1) = ( H_fock.col(t1+1) - H_fock.col(t1-1) ) / (-2*dx);
+		F_f.col(t1) = ( E_f.col(t1+1) - E_f.col(t1-1) ) / (-2*dx);
 	// derivative coupling
 	mat tmp_dd;
 	for(int t1=1; t1<nx-1; t1++)

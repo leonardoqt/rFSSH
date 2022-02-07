@@ -12,15 +12,15 @@ private:
 	const double dep_bath = 0.3;
 public:
 	const int sz_s = 2;
-	const int sz_fock = 4; // this is 2^dim
-	int sz_t;
+	const int sz_f = 1<<sz_s; // this is 2^sz_s
+	const int sz_t = sz_s + nbath;
 	double dx;
 	int nx;
 	arma::vec x;
 	arma::vec Eb;
 	arma::cube Ht, Hs;
 	arma::cube eigvec_t, eigvec_s;
-	arma::mat eigval_t, eigval_s, F, H_fock;
+	arma::mat eigval_t, eigval_s, F_f, E_f;
 	arma::cube dd;
 	void generate_H(arma::vec X, double E1, double E2, double vdd, double gamma1, double gamma2);
 	//

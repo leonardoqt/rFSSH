@@ -62,9 +62,9 @@ int main()
 	double ave_hops=0.0;
 	//
 	vec vv = linspace(sqrt(2*ek0/mass),sqrt(2*ek1/mass),nek);
-	vec counter_t(HH.sz_fock,fill::zeros), counter_r(HH.sz_fock,fill::zeros);
-	mat mytraj(x.n_rows,HH.sz_fock,fill::zeros);
-	mat tottraj(x.n_rows,HH.sz_fock,fill::zeros);
+	vec counter_t(HH.sz_f,fill::zeros), counter_r(HH.sz_f,fill::zeros);
+	mat mytraj(x.n_rows,HH.sz_f,fill::zeros);
+	mat tottraj(x.n_rows,HH.sz_f,fill::zeros);
 	vec myhop(x.n_rows,fill::zeros);
 	vec tothop(x.n_rows,fill::zeros);
 	//
@@ -137,7 +137,7 @@ int main()
 	//run1 = clock::now();
 	//if (rank == 0) cout<<rank<<":  time for one traj. is "<<(run1.time_since_epoch().count() - run0.time_since_epoch().count())/1e9<<'s'<<"   "<<AA.ind_new<<endl<<endl;
 		// collect counting
-		for (int t1=0; t1<HH.sz_fock; t1++)
+		for (int t1=0; t1<HH.sz_f; t1++)
 		{
 			double* tmptraj = new double[x.n_rows];
 			double* tmptrajsum = new double[x.n_rows];
@@ -176,7 +176,7 @@ int main()
 				if (x(t1) >= xstart && x(t1) <= xend)
 				{
 					ff<<(x(t1)-xstart)/vv(iv);
-					for(int t2=0; t2<HH.sz_fock; t2++)
+					for(int t2=0; t2<HH.sz_f; t2++)
 						ff<<'\t'<<tottraj(t1,t2)/sample_myself/size;
 					ff<<endl;
 				}
@@ -189,9 +189,9 @@ int main()
 			ff.close();
 			//
 			cout<<vv(iv)*vv(iv)*mass/2;
-			for (int t1=0; t1<HH.sz_fock; t1++)
+			for (int t1=0; t1<HH.sz_f; t1++)
 				cout<<'\t'<<counter_t(t1)/sample_myself/size;
-			for (int t1=0; t1<HH.sz_fock; t1++)
+			for (int t1=0; t1<HH.sz_f; t1++)
 				cout<<'\t'<<counter_r(t1)/sample_myself/size;
 			//cout<<endl;
 			cout<<'\t'<<ave_hops/sample_myself/size<<endl;
