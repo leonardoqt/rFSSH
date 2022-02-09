@@ -18,13 +18,16 @@ public:
 	int nx;
 	arma::vec x;
 	arma::vec Eb;
+	arma::vec Evac;
 	arma::cube Ht, Hs;
 	arma::cube eigvec_t, eigvec_s;
 	arma::mat eigval_t, eigval_s, F_f, E_f;
 	arma::cube dd;
 	void generate_H(arma::vec X, double E1, double E2, double vdd, double gamma1, double gamma2);
+	void generate_H(arma::vec X, double omega, double g0, double Ed, double gamma);
 	//
 	void diag_H();
+	void diag_H_1imp();
 };
 
 #endif

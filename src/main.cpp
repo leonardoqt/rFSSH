@@ -114,7 +114,7 @@ int main()
 	//if (rank == t1%size) cout<<rank<<":  time for evolve is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
 	//past = clock::now();
 				//cout<<t1*AA.dt<<'\t';
-				EE.fit_drho_v1(HH,AA);
+				EE.fit_drho(HH,AA,1);
 	//now = clock::now();
 	//if (rank == t1%size) cout<<rank<<":  time for fit is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
 	//past = clock::now();

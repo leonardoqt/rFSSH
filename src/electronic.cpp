@@ -3,32 +3,50 @@
 
 using namespace arma;
 
-// TODO: may change from init rho0_s to rho0_fock
-void electronic::init_rho(mat rho0_s, potential& HH, double Beta)
+// TODO: may change from init N0_s to rho0_fock
+void electronic::construct_rho_fock()
 {
+	switch(sz_s)
+	{
+	case(1):
+	{
+		rho_fock(1,1) = N_s(0,0);
+		rho_fock(0,0) = cx_double(1,0) - rho_fock(1,1);
+		break;
+	}
+	case(2):
+	{
+		rho_fock(3,3) = N_s(0,0) * N_s(1,1);
+		rho_fock(1,1) = N_s(0,0) - rho_fock(3,3);
+		rho_fock(2,2) = N_s(1,1) - rho_fock(3,3);
+		rho_fock(0,0) = cx_double(1,0) - N_s(0,0) - N_s(1,1) + rho_fock(3,3);
+		rho_fock(1,2) = N_s(0,1);
+		rho_fock(2,1) = N_s(1,0);
+		break;
+	}
+	}
+}
+
+void electronic::init_rho(mat N0_s, potential& HH, double Beta)
+{
+	sz_s = HH.sz_s;
+	sz_t = HH.sz_t;
+	sz_f = HH.sz_f;
 	beta = Beta;
 	vec N_b = 1/(1+exp(beta * HH.Eb));
-	N_t = zeros<cx_mat>(HH.sz_t,HH.sz_t);
-	N_s = zeros<cx_mat>(HH.sz_s,HH.sz_s);
-	rho_fock = zeros<cx_mat>(HH.sz_f,HH.sz_f);
-	N_t.diag() = cx_vec (join_vert(zeros<vec>(HH.sz_s),N_b),zeros<vec>(HH.sz_t) );
-	N_t(span(0,1),span(0,1)) = cx_mat (rho0_s,zeros<mat>(HH.sz_s,HH.sz_s));
+	N_t = zeros<cx_mat>(sz_t,sz_t);
+	N_s = zeros<cx_mat>(sz_s,sz_s);
+	rho_fock = zeros<cx_mat>(sz_f,sz_f);
+	N_t.diag() = cx_vec (join_vert(zeros<vec>(sz_s),N_b),zeros<vec>(sz_t) );
+	N_t(span(0,sz_s-1),span(0,sz_s-1)) = cx_mat (N0_s,zeros<mat>(sz_s,sz_s));
 	//
-	N_s = N_t(span(0,1),span(0,1));
+	N_s = N_t(span(0,sz_s-1),span(0,sz_s-1));
 	//
-	rho_fock(3,3) = N_s(0,0) * N_s(1,1);
-	rho_fock(1,1) = N_s(0,0) - rho_fock(3,3);
-	rho_fock(2,2) = N_s(1,1) - rho_fock(3,3);
-	rho_fock(0,0) = cx_double(1,0) - N_s(0,0) - N_s(1,1) + rho_fock(3,3);
-	rho_fock(1,2) = N_s(0,1);
-	rho_fock(2,1) = N_s(1,0);
+	construct_rho_fock();
 	//
 	rho_fock_old = rho_fock;
 	//
-	hop_bath = zeros<mat>(HH.sz_f,HH.sz_f);
-	//real(N_s).print("N_s");
-	//real(N_t).print("N_t");
-	//real(rho_fock).print("rho_fock");
+	hop_bath = zeros<mat>(sz_f,sz_f);
 }
 
 void electronic::evolve(potential& HH, ionic& AA)
@@ -38,12 +56,12 @@ void electronic::evolve(potential& HH, ionic& AA)
 	mat U_s = HH.eigvec_s.slice(AA.ind_pre);
 	mat U_s2= HH.eigvec_s.slice(AA.ind_new);
 	// TODO: make sure we want the new adiabats (after dt not before dt, which is U_s)
-	cx_mat d0_ad = cx_mat(eye(HH.sz_t,HH.sz_s),zeros<mat>(HH.sz_t,HH.sz_s)) * U_s2;
+	cx_mat d0_ad = cx_mat(eye(sz_t,sz_s),zeros<mat>(sz_t,sz_s)) * U_s2;
 	cx_vec phase = exp(ii*HH.eigval_t.col(AA.ind_pre)*AA.dt);
 	//
 	// N_t
-	cx_mat U_t_phase = zeros<cx_mat>(HH.sz_t,HH.sz_t);
-	for (int t1=0; t1<HH.sz_t; t1++)
+	cx_mat U_t_phase = zeros<cx_mat>(sz_t,sz_t);
+	for (int t1=0; t1<sz_t; t1++)
 		U_t_phase.col(t1) = phase(t1) * U_t.col(t1);
 	cx_mat EHT = U_t_phase * U_t.t();
 	N_t = EHT.t() * N_t * EHT;
@@ -53,16 +71,8 @@ void electronic::evolve(potential& HH, ionic& AA)
 	//
 	// rho_fock and drho
 	rho_fock_old = rho_fock;
-	rho_fock(3,3) = N_s(0,0) * N_s(1,1);
-	rho_fock(1,1) = N_s(0,0) - rho_fock(3,3);
-	rho_fock(2,2) = N_s(1,1) - rho_fock(3,3);
-	rho_fock(0,0) = cx_double(1,0) - N_s(0,0) - N_s(1,1) + rho_fock(3,3);
-	rho_fock(1,2) = N_s(0,1);
-	rho_fock(2,1) = N_s(1,0);
+	construct_rho_fock();
 	//
-	//rho_fock.print("rho_fock");
-	//rho_fock_old.print("rho_fock_old");
-	//exit(EXIT_FAILURE);
 	drho = ( rho_fock - rho_fock_old ) / AA.dt;
 	//
 	// drho_2fit, it equals drho/dt + i[H, rho] + [T, rho]
@@ -70,12 +80,8 @@ void electronic::evolve(potential& HH, ionic& AA)
 	mat hh = diagmat(HH.E_f.col(AA.ind_pre));
 	mat dd = (HH.dd.slice(AA.ind_pre) + HH.dd.slice(AA.ind_new))/2;
 	drho_2fit  = drho;
-	//drho_2fit.print("drho2fit");
 	drho_2fit +=       ii * ( hh*rho_fock_old - rho_fock_old*hh );
 	drho_2fit += AA.v_pre * ( dd*rho_fock_old - rho_fock_old*dd );
-	//drho.print("drho");
-	//drho_2fit.print("drho2fit");
-	//exit(EXIT_FAILURE);
 }
 
 void electronic::fit_drho_v1(potential& HH, ionic& AA)
@@ -197,7 +203,7 @@ void electronic::fit_drho_v2(potential& HH, ionic& AA)
 	//real(rho_fock.diag()).t().print();
 }
 
-void electronic::fit_drho_v3(potential& HH, ionic& AA)
+void electronic::fit_drho_v3()
 {
 	// the jump operator corresponding to the same single-electron
 	// hops can be merged if only looking at the diagonal of rho
@@ -257,6 +263,88 @@ void electronic::fit_drho_v3(potential& HH, ionic& AA)
 	//Lambda.t().print();
 }
 
+void electronic::fit_drho_v3_1imp()
+{
+	// the jump operator corresponding to the same single-electron
+	// hops can be merged if only looking at the diagonal of rho
+	//
+	//   0,  1
+	// L01,L10
+	// L01 -> |0><1|, which hops from 1 to 0
+	cube LL(sz_f,sz_f,2,fill::zeros);
+	mat L;
+	LL(0,1,0) = LL(1,0,1) = 1;
+	//
+	cx_mat rho_dot0(sz_f,sz_f,fill::zeros);
+	cx_mat rho_dot1(sz_f,sz_f,fill::zeros);
+	// lambda_01/lambda_10 = exp(beta*E), i.e.,
+	// lambda_10 = lambda_01 * exp(-beta*E)
+	L = LL.slice(0);
+	rho_dot0 += L*rho_fock_old*L.t() - (L.t()*L*rho_fock_old + rho_fock_old*L.t()*L)/2;
+	L = LL.slice(1);
+	rho_dot1 += L*rho_fock_old*L.t() - (L.t()*L*rho_fock_old + rho_fock_old*L.t()*L)/2;
+	//
+	// fitting: write rho as a column vector, V = drho_2fit, M = [rho_dot1, rho_dot2]
+	// then Lambda = (M\dagger M)^(-1)*Re(M\dagger V), where Lambda = [l1; l2]
+	vec V = real( drho_2fit.diag() );
+	mat M = real( join_horiz(rho_dot0.diag(),rho_dot1.diag()) );
+	V = V.rows(0,sz_f-2);
+	M = M.rows(0,sz_f-2);
+	mat MM = M.t()*M;
+	vec MV = M.t()*V;
+	vec Lambda = solve(MM+eye(sz_f,sz_f)*norm(MM)*1e-8,MV);
+	//cout<<norm(M*Lambda-V)/norm(V)<<endl;
+	//V.t().print("target");
+	//(M*Lambda-V).t().print("res");
+	//exit(EXIT_FAILURE);
+	//
+	// put results into hop_bath, where hop_bath(i,j) is from i to j, i.e., |j><i|
+	hop_bath = zeros<mat>(sz_f,sz_f);
+	hop_bath(1,0) = Lambda(0);
+	hop_bath(0,1) = Lambda(1);
+	//Lambda.t().print();
+}
+
+void electronic::fit_drho(potential &HH, ionic &AA, int method)
+{
+	switch(sz_s)
+	{
+	case(1):
+	{
+		switch(method)
+		{
+		case(3):
+		{
+			fit_drho_v3_1imp();
+			break;
+		}
+		}
+		break;
+	}
+	case(2):
+	{
+		switch(method)
+		{
+		case(1):
+		{
+			fit_drho_v1(HH,AA);
+			break;
+		}
+		case(2):
+		{
+			fit_drho_v2(HH,AA);
+			break;
+		}
+		case(3):
+		{
+			fit_drho_v3();
+			break;
+		}
+		}
+		break;
+	}
+	}
+}
 
 //void electronic::try_decoherence(ionic& AA)
 //{
