@@ -65,6 +65,23 @@ void potential::generate_H(arma::vec X, double omega, double g0, double Ed, doub
 
 void potential::diag_H()
 {
+	switch(sz_s)
+	{
+	case(1):
+		{
+			diag_H_1imp();
+			break;
+		}
+	case(2):
+		{
+			diag_H_2imp();
+			break;
+		}
+	}
+}
+
+void potential::diag_H_2imp()
+{
 	vec tmp;
 	eigvec_t = cube(sz_t,sz_t,nx,fill::zeros);
 	eigvec_s = cube(sz_s,sz_s,nx,fill::zeros);

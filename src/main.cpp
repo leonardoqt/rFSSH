@@ -90,9 +90,9 @@ int main()
 			AA.init(HH,mass,vv(iv),xstart,state,-xend,xend);
 			EE.init_rho(rho0,HH,beta);
 			// run fssh
-			for (int t1=0; t1<2400; t1++)
+			double tmp_time = 0.0;
+			for (int t1=0; t1<9600; t1++)
 			{
-				double tmp_time = 0.0;
 				AA.move(HH);
 				mytraj(AA.ind_pre,AA.istate) += 1.0;
 				myhop(AA.ind_pre) += AA.nhops;
@@ -105,7 +105,7 @@ int main()
 				//EE.try_decoherence(AA);
 				AA.try_hop(HH,EE.rho_fock_old,EE.hop_bath);
 				tmp_time += AA.dt;
-				record<<tmp_time<<'\t'<<AA.ek<<'\t'<<AA.etot;
+				record<<tmp_time<<'\t'<<AA.ek<<'\t'<<AA.etot<<endl;
 				if (abs(AA.check_stop()))
 					break;
 			}

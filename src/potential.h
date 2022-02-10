@@ -10,6 +10,8 @@ class potential
 private:
 	const int nbath = 100;
 	const double dep_bath = 0.3;
+	void diag_H_1imp();
+	void diag_H_2imp();
 public:
 	const int sz_s = 1;
 	const int sz_f = 1<<sz_s; // this is 2^sz_s
@@ -27,7 +29,6 @@ public:
 	void generate_H(arma::vec X, double omega, double g0, double Ed, double gamma);
 	//
 	void diag_H();
-	void diag_H_1imp();
 };
 
 #endif
