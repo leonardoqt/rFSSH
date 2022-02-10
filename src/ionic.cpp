@@ -30,6 +30,7 @@ void ionic::init(potential &HH, double Mass, double vv, double xx, int state, do
 			ind_r = t1;
 			break;
 		}
+	etot = ek + HH.E_f(istate,ind_new);
 }
 
 void ionic::move(potential& HH)
@@ -184,6 +185,7 @@ void ionic::try_hop(potential& HH, cx_mat& rho, mat& hop_bath)
 	}
 	if (istate != new_state) nhops++;
 	istate = new_state;
+	etot = ek + HH.E_f(istate,ind_new);
 }
 
 //void ionic::print_rate(arma::vec& xx, potential& HH, arma::cx_mat& rho)

@@ -15,7 +15,7 @@ public:
 	int ind_l, ind_r; // threshold for move left/right
 	int istate;
 	int nhops;
-	double mass, ek, v_pre, v_new;
+	double mass, ek, etot, v_pre, v_new;
 	double dt;
 	//
 	void init(potential& HH, double Mass, double vv, double xx, int state, double xl, double xr);

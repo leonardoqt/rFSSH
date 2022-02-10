@@ -22,10 +22,8 @@ int main()
 	MPI_Comm_size(MPI_COMM_WORLD,&size);
 	arma_rng::set_seed(now.time_since_epoch().count()+rank*10);
 	//
-	double E1 = -0.1, E2 = -0.11, vdd = 0.04;
-	double gamma1 = 0.02, gamma2 = 0.0;
-	double temperature = 0.1;
-	double beta = 1/temperature;
+	double gamma = 0.003, Temp = 0.03, omega = 0.003, Ed = 0.0, g0 = 0.005;
+	double beta = 1/Temp;
 	//
 	double ek0 = 1e-3, ek1 = 1e-1;
 	// TODO: for now impose start from no population on impurities. need to decide which state to start if having initila population
@@ -34,27 +32,26 @@ int main()
 	int sample = 10000;
 	//
 	if ( rank == 0 )
-		cin>>E1>>E2>>vdd>>gamma1>>gamma2>>ek0>>ek1>>nek>>sample;
-	MPI_Bcast(&E1     ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
-	MPI_Bcast(&E2     ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
-	MPI_Bcast(&vdd    ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
-	MPI_Bcast(&gamma1 ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
-	MPI_Bcast(&gamma2 ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+		cin>>omega>>Ed>>g0>>gamma>>Temp>>ek0>>ek1>>nek>>sample;
+	MPI_Bcast(&omega  ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+	MPI_Bcast(&Ed     ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+	MPI_Bcast(&g0     ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+	MPI_Bcast(&gamma  ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+	MPI_Bcast(&Temp   ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
 	MPI_Bcast(&ek0    ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
 	MPI_Bcast(&ek1    ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
 	MPI_Bcast(&nek    ,1,MPI_INT,0,MPI_COMM_WORLD);
 	MPI_Bcast(&sample ,1,MPI_INT,0,MPI_COMM_WORLD);
-	//MPI_Bcast(&state  ,1,MPI_INT,0,MPI_COMM_WORLD);
 	//====================
 	potential HH;
 	ionic AA;
 	electronic EE;
-	vec x = linspace(-8,8,1600);
+	vec x = linspace(-12,12,1200);
 	mat rho0(HH.sz_s,HH.sz_s,fill::zeros);
 	//
-	double mass = 2000;
-	double xstart = -6;
-	double xend = 6;
+	double mass = 1/omega;
+	double xstart = 0.0;
+	double xend = 11.8;
 	//double sigma_x = 0.5;
 	//
 	int sample_myself;
@@ -70,18 +67,11 @@ int main()
 	//
 	sample_myself = sample / size;
 	//
-	HH.generate_H(x,E1,E2,vdd,gamma1,gamma2);
+	HH.generate_H(x,omega,g0,Ed,gamma);
 	//past = clock::now();
 	HH.diag_H();
 	//now = clock::now();
 	//if (rank == 0) cout<<"time for diag is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl<<endl;
-	////
-	//if (rank ==0)
-	//	for(uword t1=0; t1< x.n_elem; t1++)
-	//		cout<<x(t1)<<'\t'<<HH.eigval.col(t1).t();
-	//MPI_Finalize();
-	//return 0;
-	////
 	for (int iv = 0; iv<nek; iv++)
 	{
 		counter_t = counter_t*0;
@@ -91,7 +81,8 @@ int main()
 		tottraj.zeros();
 		myhop.zeros();
 		tothop.zeros();
-	//run0 = clock::now();
+		ofstream record;
+		record.open("m_v-"+to_string(iv)+"_rk-"+to_string(rank)+".dat");
 		for (int isample=0; isample<sample_myself;isample++)
 		{
 			//TODO: no rand for testing
@@ -101,31 +92,22 @@ int main()
 			// run fssh
 			for (int t1=0; t1<2400; t1++)
 			{
-	//loop0 = clock::now();
-	//past = clock::now();
+				double tmp_time = 0.0;
 				AA.move(HH);
 				mytraj(AA.ind_pre,AA.istate) += 1.0;
 				myhop(AA.ind_pre) += AA.nhops;
-	//now = clock::now();
-	//if (rank == t1%size) cout<<rank<<":  time for move is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
 	//past = clock::now();
 				EE.evolve(HH,AA);
 	//now = clock::now();
 	//if (rank == t1%size) cout<<rank<<":  time for evolve is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
-	//past = clock::now();
 				//cout<<t1*AA.dt<<'\t';
-				EE.fit_drho(HH,AA,1);
-	//now = clock::now();
-	//if (rank == t1%size) cout<<rank<<":  time for fit is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
-	//past = clock::now();
+				EE.fit_drho(HH,AA,3);
 				//EE.try_decoherence(AA);
 				AA.try_hop(HH,EE.rho_fock_old,EE.hop_bath);
-	//now = clock::now();
-	//if (rank == t1%size) cout<<rank<<":  time for hop is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl;
+				tmp_time += AA.dt;
+				record<<tmp_time<<'\t'<<AA.ek<<'\t'<<AA.etot;
 				if (abs(AA.check_stop()))
 					break;
-	//loop1 = clock::now();
-	//if (rank == t1%size) cout<<rank<<":  time for one loop is "<<(loop1.time_since_epoch().count() - loop0.time_since_epoch().count())/1e9<<'s'<<"   "<<AA.ind_new<<endl<<endl;
 			}
 			// count rate
 			if (x(AA.ind_new) < 0)
@@ -134,8 +116,7 @@ int main()
 				counter_t(AA.istate) += 1.0;
 			ave_hops += AA.nhops;
 		}
-	//run1 = clock::now();
-	//if (rank == 0) cout<<rank<<":  time for one traj. is "<<(run1.time_since_epoch().count() - run0.time_since_epoch().count())/1e9<<'s'<<"   "<<AA.ind_new<<endl<<endl;
+		record.close();
 		// collect counting
 		for (int t1=0; t1<HH.sz_f; t1++)
 		{

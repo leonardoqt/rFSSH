@@ -11,7 +11,7 @@ private:
 	const int nbath = 100;
 	const double dep_bath = 0.3;
 public:
-	const int sz_s = 2;
+	const int sz_s = 1;
 	const int sz_f = 1<<sz_s; // this is 2^sz_s
 	const int sz_t = sz_s + nbath;
 	double dx;
