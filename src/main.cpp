@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include "counter.h"
 #include "potential.h"
 #include "ionic.h"
 #include "electronic.h"
@@ -31,8 +32,11 @@ int main()
 	int nek = 60, state = 0;
 	int sample = 10000;
 	//
+	double time0 = 0.0, time1 = 20000.0;
+	int ntime = 400;
+	//
 	if ( rank == 0 )
-		cin>>omega>>Ed>>g0>>gamma>>Temp>>ek0>>ek1>>nek>>sample;
+		cin>>omega>>Ed>>g0>>gamma>>Temp>>ek0>>ek1>>nek>>sample>>time0>>time1>>ntime;
 	MPI_Bcast(&omega  ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
 	MPI_Bcast(&Ed     ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
 	MPI_Bcast(&g0     ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
@@ -42,10 +46,14 @@ int main()
 	MPI_Bcast(&ek1    ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
 	MPI_Bcast(&nek    ,1,MPI_INT,0,MPI_COMM_WORLD);
 	MPI_Bcast(&sample ,1,MPI_INT,0,MPI_COMM_WORLD);
+	MPI_Bcast(&time0  ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+	MPI_Bcast(&time1  ,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+	MPI_Bcast(&ntime  ,1,MPI_INT,0,MPI_COMM_WORLD);
 	//====================
 	potential HH;
 	ionic AA;
 	electronic EE;
+	counter time_evo;
 	vec x = linspace(-12,12,1200);
 	mat rho0(HH.sz_s,HH.sz_s,fill::zeros);
 	//
@@ -74,6 +82,7 @@ int main()
 	//if (rank == 0) cout<<"time for diag is "<<(now.time_since_epoch().count() - past.time_since_epoch().count())/1e9<<'s'<<endl<<endl;
 	for (int iv = 0; iv<nek; iv++)
 	{
+		time_evo.init(ntime,time0,time1);
 		counter_t = counter_t*0;
 		counter_r = counter_r*0;
 		ave_hops = 0;
@@ -81,8 +90,6 @@ int main()
 		tottraj.zeros();
 		myhop.zeros();
 		tothop.zeros();
-		ofstream record;
-		record.open("m_v-"+to_string(iv)+"_rk-"+to_string(rank)+".dat");
 		for (int isample=0; isample<sample_myself;isample++)
 		{
 			//TODO: no rand for testing
@@ -105,7 +112,7 @@ int main()
 				//EE.try_decoherence(AA);
 				AA.try_hop(HH,EE.rho_fock_old,EE.hop_bath);
 				tmp_time += AA.dt;
-				record<<tmp_time<<'\t'<<AA.ek<<'\t'<<AA.etot<<endl;
+				time_evo.add(tmp_time,AA.ek,AA.etot);
 				if (abs(AA.check_stop()))
 					break;
 			}
@@ -116,7 +123,6 @@ int main()
 				counter_t(AA.istate) += 1.0;
 			ave_hops += AA.nhops;
 		}
-		record.close();
 		// collect counting
 		for (int t1=0; t1<HH.sz_f; t1++)
 		{
@@ -137,6 +143,11 @@ int main()
 			MPI_Allreduce(&tmp,&tmp2,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 			counter_r(t1) = tmp2;
 		}
+		//
+		MPI_Allreduce(time_evo.ek,time_evo.ek_all,time_evo.nbin,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+		MPI_Allreduce(time_evo.et,time_evo.et_all,time_evo.nbin,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+		MPI_Allreduce(time_evo.count,time_evo.count_all,time_evo.nbin,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
+		//
 		double* tmphop = new double[x.n_rows];
 		double* tmphopsum = new double[x.n_rows];
 		for (size_t t2=0; t2<x.n_rows; t2++)
@@ -163,7 +174,12 @@ int main()
 				}
 			ff.close();
 			//
-			ff.open("hop_"+to_string(iv)+".dat");
+			ff.open("m_v-"+to_string(iv)+".dat");
+			for(int t1=0; t1<time_evo.nbin; t1++)
+				ff<<(time_evo.dt[t1]+time_evo.dt[t1+1])/2<<'\t'<<time_evo.ek_all[t1]/time_evo.count_all[t1]<<'\t'<<time_evo.et_all[t1]/time_evo.count_all[t1]<<endl;
+			ff.close();
+			//
+			ff.open("hop_v-"+to_string(iv)+".dat");
 			for(size_t t1=0; t1<x.n_rows; t1++)
 				if (x(t1) >= xstart && x(t1) <= xend)
 					ff<<(x(t1)-xstart)/vv(iv)<<'\t'<<tothop(t1)/sample_myself/size<<endl;
