@@ -54,7 +54,7 @@ int main()
 	ionic AA;
 	electronic EE;
 	counter time_evo;
-	vec x = linspace(-12,12,1200);
+	vec x = linspace(-12,12,240);
 	mat rho0(HH.sz_s,HH.sz_s,fill::zeros);
 	//
 	double mass = 1/omega;
@@ -98,7 +98,7 @@ int main()
 			EE.init_rho(rho0,HH,beta);
 			// run fssh
 			double tmp_time = 0.0;
-			for (int t1=0; t1<9600; t1++)
+			for (int t1=0; t1<48000; t1++)
 			{
 				AA.move(HH);
 				mytraj(AA.ind_pre,AA.istate) += 1.0;
@@ -176,7 +176,7 @@ int main()
 			//
 			ff.open("m_v-"+to_string(iv)+".dat");
 			for(int t1=0; t1<time_evo.nbin; t1++)
-				ff<<(time_evo.dt[t1]+time_evo.dt[t1+1])/2<<'\t'<<time_evo.ek_all[t1]/time_evo.count_all[t1]<<'\t'<<time_evo.et_all[t1]/time_evo.count_all[t1]<<endl;
+				ff<<(time_evo.dt[t1]+time_evo.dt[t1+1])/2<<'\t'<<time_evo.ek_all[t1]/time_evo.count_all[t1]<<'\t'<<time_evo.et_all[t1]/time_evo.count_all[t1]<<'\t'<<time_evo.count_all[t1]<<endl;
 			ff.close();
 			//
 			ff.open("hop_v-"+to_string(iv)+".dat");
