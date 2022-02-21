@@ -112,7 +112,7 @@ int main()
 				//EE.try_decoherence(AA);
 				AA.try_hop(HH,EE.rho_fock_old,EE.hop_bath);
 				tmp_time += AA.dt;
-				time_evo.add(tmp_time,AA.ek,AA.etot);
+				time_evo.add(tmp_time,AA.ek,AA.etot,AA.istate);
 				if (abs(AA.check_stop()))
 					break;
 			}
@@ -146,6 +146,8 @@ int main()
 		//
 		MPI_Allreduce(time_evo.ek,time_evo.ek_all,time_evo.nbin,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 		MPI_Allreduce(time_evo.et,time_evo.et_all,time_evo.nbin,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+		MPI_Allreduce(time_evo.p0,time_evo.p0_all,time_evo.nbin,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+		MPI_Allreduce(time_evo.p1,time_evo.p1_all,time_evo.nbin,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 		MPI_Allreduce(time_evo.count,time_evo.count_all,time_evo.nbin,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
 		//
 		double* tmphop = new double[x.n_rows];
@@ -163,27 +165,32 @@ int main()
 		if (rank == 0)
 		{
 			ofstream ff;
-			ff.open("traj_"+to_string(iv)+".dat");
-			for(size_t t1=0; t1<x.n_rows; t1++)
-				if (x(t1) >= xstart && x(t1) <= xend)
-				{
-					ff<<(x(t1)-xstart)/vv(iv);
-					for(int t2=0; t2<HH.sz_f; t2++)
-						ff<<'\t'<<tottraj(t1,t2)/sample_myself/size;
-					ff<<endl;
-				}
-			ff.close();
+			//ff.open("traj_"+to_string(iv)+".dat");
+			//for(size_t t1=0; t1<x.n_rows; t1++)
+			//	if (x(t1) >= xstart && x(t1) <= xend)
+			//	{
+			//		ff<<(x(t1)-xstart)/vv(iv);
+			//		for(int t2=0; t2<HH.sz_f; t2++)
+			//			ff<<'\t'<<tottraj(t1,t2)/sample_myself/size;
+			//		ff<<endl;
+			//	}
+			//ff.close();
 			//
 			ff.open("m_v-"+to_string(iv)+".dat");
 			for(int t1=0; t1<time_evo.nbin; t1++)
 				ff<<(time_evo.dt[t1]+time_evo.dt[t1+1])/2<<'\t'<<time_evo.ek_all[t1]/time_evo.count_all[t1]<<'\t'<<time_evo.et_all[t1]/time_evo.count_all[t1]<<'\t'<<time_evo.count_all[t1]<<endl;
 			ff.close();
 			//
-			ff.open("hop_v-"+to_string(iv)+".dat");
-			for(size_t t1=0; t1<x.n_rows; t1++)
-				if (x(t1) >= xstart && x(t1) <= xend)
-					ff<<(x(t1)-xstart)/vv(iv)<<'\t'<<tothop(t1)/sample_myself/size<<endl;
+			ff.open("traj_v-"+to_string(iv)+".dat");
+			for(int t1=0; t1<time_evo.nbin; t1++)
+				ff<<(time_evo.dt[t1]+time_evo.dt[t1+1])/2<<'\t'<<time_evo.p0_all[t1]/time_evo.count_all[t1]<<'\t'<<time_evo.p1_all[t1]/time_evo.count_all[t1]<<endl;
 			ff.close();
+			//
+			//ff.open("hop_v-"+to_string(iv)+".dat");
+			//for(size_t t1=0; t1<x.n_rows; t1++)
+			//	if (x(t1) >= xstart && x(t1) <= xend)
+			//		ff<<(x(t1)-xstart)/vv(iv)<<'\t'<<tothop(t1)/sample_myself/size<<endl;
+			//ff.close();
 			//
 			cout<<vv(iv)*vv(iv)*mass/2;
 			for (int t1=0; t1<HH.sz_f; t1++)
