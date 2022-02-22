@@ -20,7 +20,7 @@ public:
 	int nx;
 	arma::vec x;
 	arma::vec Eb;
-	arma::vec Evac;
+	arma::vec Eion, Fion;
 	arma::cube Ht, Hs;
 	arma::cube eigvec_t, eigvec_s;
 	arma::mat eigval_t, eigval_s, F_f, E_f;

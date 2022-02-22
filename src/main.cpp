@@ -113,6 +113,8 @@ int main()
 				AA.try_hop(HH,EE.rho_fock_old,EE.hop_bath);
 				tmp_time += AA.dt;
 				time_evo.add(tmp_time,AA.ek,AA.etot,AA.istate);
+				if (tmp_time > time1)
+					break;
 				if (abs(AA.check_stop()))
 					break;
 			}

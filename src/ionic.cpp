@@ -30,12 +30,12 @@ void ionic::init(potential &HH, double Mass, double vv, double xx, int state, do
 			ind_r = t1;
 			break;
 		}
-	etot = ek + HH.E_f(istate,ind_new);
+	etot = ek + HH.E_f(istate,ind_new) + HH.Eion(ind_new);
 }
 
 void ionic::move(potential& HH)
 {
-	double aa = HH.F_f(istate,ind_new)/mass;
+	double aa = ( HH.F_f(istate,ind_new) + HH.Fion(ind_new) )/mass;
 	double dtl = -1,dtr = -1, deltal,deltar,t1,t2;
 	double tmp;
 	//
@@ -57,7 +57,7 @@ void ionic::move(potential& HH)
 		deltal = v_pre*v_pre-2*aa*HH.dx;
 		deltar = v_pre*v_pre+2*aa*HH.dx;
 		// allow right
-		if (ek + HH.E_f(istate,ind_pre) >= HH.E_f(istate,ind_pre+1) && deltar > 0)
+		if (ek + HH.E_f(istate,ind_pre) + HH.Fion(ind_pre) >= HH.E_f(istate,ind_pre+1) + HH.Fion(ind_pre+1) && deltar > 0)
 		{
 			deltar = sqrt(deltar);
 			t1 = (-v_pre + deltar) / aa;
@@ -68,7 +68,7 @@ void ionic::move(potential& HH)
 				dtr = fmax(t1,t2);
 		}
 		// allow left
-		if (ek + HH.E_f(istate,ind_pre) >= HH.E_f(istate,ind_pre-1) && deltal > 0)
+		if (ek + HH.E_f(istate,ind_pre) + HH.Fion(ind_pre) >= HH.E_f(istate,ind_pre-1) + HH.Fion(ind_pre-1) && deltal > 0)
 		{
 			deltal = sqrt(deltal);
 			t1 = (-v_pre + deltal) / aa;
@@ -93,14 +93,14 @@ void ionic::move(potential& HH)
 		{
 			// move right
 			ind_new = ind_pre+1;
-			ek = HH.E_f(istate,ind_pre) + ek - HH.E_f(istate,ind_new);
+			ek = HH.E_f(istate,ind_pre) + HH.Eion(ind_pre) + ek - HH.E_f(istate,ind_new) - HH.Eion(ind_new);
 			v_new = sqrt(2*ek / mass);
 		}
 		else if (tmp < -0.5*HH.dx)
 		{
 			// move left
 			ind_new = ind_pre-1;
-			ek = HH.E_f(istate,ind_pre) + ek - HH.E_f(istate,ind_new);
+			ek = HH.E_f(istate,ind_pre) + HH.Eion(ind_pre) + ek - HH.E_f(istate,ind_new) - HH.Eion(ind_new);
 			v_new =-sqrt(2*ek / mass);
 		}
 		else
@@ -185,7 +185,7 @@ void ionic::try_hop(potential& HH, cx_mat& rho, mat& hop_bath)
 	}
 	if (istate != new_state) nhops++;
 	istate = new_state;
-	etot = ek + HH.E_f(istate,ind_new);
+	etot = ek + HH.E_f(istate,ind_new) + HH.Eion(ind_new);
 }
 
 //void ionic::print_rate(arma::vec& xx, potential& HH, arma::cx_mat& rho)

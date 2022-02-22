@@ -9,7 +9,8 @@ void potential::generate_H(vec X, double E1, double E2, double vdd, double gamma
 	x = X;
 	dx = x(1) - x(0);
 	nx = x.n_rows;
-	Evac = zeros<vec>(nx);
+	Eion = zeros<vec>(nx);
+	Fion = zeros<vec>(nx);
 	Hs = cube(sz_s,sz_s,nx,fill::zeros);
 	Ht = cube(sz_t,sz_t,nx,fill::zeros);
 	Eb = linspace(-dep_bath,dep_bath,nbath);
@@ -41,7 +42,8 @@ void potential::generate_H(arma::vec X, double omega, double g0, double Ed, doub
 	x = X;
 	dx = x(1) - x(0);
 	nx = x.n_rows;
-	Evac = zeros<vec>(nx);
+	Eion = zeros<vec>(nx);
+	Fion = zeros<vec>(nx);
 	Hs = cube(sz_s,sz_s,nx,fill::zeros);
 	Ht = cube(sz_t,sz_t,nx,fill::zeros);
 	Eb = linspace(-dep_bath,dep_bath,nbath);
@@ -50,8 +52,8 @@ void potential::generate_H(arma::vec X, double omega, double g0, double Ed, doub
 	//=========================================
 	for (int t1=0; t1<nx; t1++)
 	{
-		Evac(t1) = 0.5*omega*x(t1)*x(t1);
-		Hs(0,0,t1) = 0.5*omega*x(t1)*x(t1) + sqrt(2)*g0*x(t1) + Ed;
+		Eion(t1) = 0.5*omega*x(t1)*x(t1);
+		Hs(0,0,t1) = sqrt(2)*g0*x(t1) + Ed;
 		Ht.slice(t1).diag() = join_vert(Hs.slice(t1).diag(),Eb);
 		for (int t2=0; t2<nbath; t2++)
 		{
@@ -110,14 +112,17 @@ void potential::diag_H_2imp()
 	// E_f
 	for(int t1=0; t1<nx; t1++)
 	{
-		E_f(0,t1) = Evac(t1);
+		E_f(0,t1) = 0;
 		E_f(1,t1) = eigval_s(0,t1);
 		E_f(2,t1) = eigval_s(1,t1);
 		E_f(3,t1) = E_f(1,t1) + E_f(2,t1);
 	}
 	// force
 	for(int t1=1; t1<nx-1; t1++)
+	{
 		F_f.col(t1) = ( E_f.col(t1+1) - E_f.col(t1-1) ) / (-2*dx);
+		Fion(t1) = ( Eion(t1+1) - Eion(t1-1) ) / (-2*dx);
+	}
 	// derivative coupling
 	mat tmp_dd;
 	for(int t1=1; t1<nx-1; t1++)
@@ -160,12 +165,15 @@ void potential::diag_H_1imp()
 	// E_f
 	for(int t1=0; t1<nx; t1++)
 	{
-		E_f(0,t1) = Evac(t1);
+		E_f(0,t1) = 0;
 		E_f(1,t1) = eigval_s(0,t1);
 	}
 	// force
 	for(int t1=1; t1<nx-1; t1++)
+	{
 		F_f.col(t1) = ( E_f.col(t1+1) - E_f.col(t1-1) ) / (-2*dx);
+		Fion(t1) = ( Eion(t1+1) - Eion(t1-1) ) / (-2*dx);
+	}
 	// derivative coupling
 	// it is all zero, nothing to calculate
 }
