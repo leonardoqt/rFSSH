@@ -24,7 +24,6 @@ int main()
 	arma_rng::set_seed(now.time_since_epoch().count()+rank*10);
 	//
 	double gamma = 0.003, Temp = 0.03, omega = 0.003, Ed = 0.0, g0 = 0.005;
-	double beta = 1/Temp;
 	//
 	double ek0 = 1e-3, ek1 = 1e-1;
 	// TODO: for now impose start from no population on impurities. need to decide which state to start if having initila population
@@ -58,6 +57,7 @@ int main()
 	mat rho0(HH.sz_s,HH.sz_s,fill::zeros);
 	//
 	double mass = 1/omega;
+	double beta = 1/Temp;
 	double xstart = 0.0;
 	double xend = 11.8;
 	//double sigma_x = 0.5;
