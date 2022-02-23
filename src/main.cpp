@@ -180,12 +180,14 @@ int main()
 			//
 			ff.open("m_v-"+to_string(iv)+".dat");
 			for(int t1=0; t1<time_evo.nbin; t1++)
-				ff<<(time_evo.dt[t1]+time_evo.dt[t1+1])/2<<'\t'<<time_evo.ek_all[t1]/time_evo.count_all[t1]<<'\t'<<time_evo.et_all[t1]/time_evo.count_all[t1]<<'\t'<<time_evo.count_all[t1]<<endl;
+				if (time_evo.count_all[t1] > 0)
+					ff<<(time_evo.dt[t1]+time_evo.dt[t1+1])/2<<'\t'<<time_evo.ek_all[t1]/time_evo.count_all[t1]<<'\t'<<time_evo.et_all[t1]/time_evo.count_all[t1]<<'\t'<<time_evo.count_all[t1]<<endl;
 			ff.close();
 			//
 			ff.open("traj_v-"+to_string(iv)+".dat");
 			for(int t1=0; t1<time_evo.nbin; t1++)
-				ff<<(time_evo.dt[t1]+time_evo.dt[t1+1])/2<<'\t'<<time_evo.p0_all[t1]/time_evo.count_all[t1]<<'\t'<<time_evo.p1_all[t1]/time_evo.count_all[t1]<<endl;
+				if (time_evo.count_all[t1] > 0)
+					ff<<(time_evo.dt[t1]+time_evo.dt[t1+1])/2<<'\t'<<time_evo.p0_all[t1]/time_evo.count_all[t1]<<'\t'<<time_evo.p1_all[t1]/time_evo.count_all[t1]<<endl;
 			ff.close();
 			//
 			//ff.open("hop_v-"+to_string(iv)+".dat");
